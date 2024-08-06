@@ -13,7 +13,7 @@ import inspect
 import logging
 from gudhi import bottleneck_distance
 
-from openalea.mtg.traversal import pre_order, post_order
+from openalea.mtg.traversal import pre_order2, post_order
 from openalea.mtg import turtle as turt
 from log.visualize import plot_mtg, plot_mtg_alt, soil_voxels_mesh, shoot_plantgl_to_mesh
 
@@ -25,6 +25,7 @@ class Logger:
                     recording_raw=False,
                     final_snapshots=False,
                     recording_sums=True,
+                    static_mtg=False,
                     recording_performance=True,
                     recording_barcodes=False, compare_to_ref_barcode=False,
                     on_sums=False,
@@ -35,6 +36,7 @@ class Logger:
                     recording_mtg=False,
                     recording_raw=False,
                     recording_sums=True,
+                    static_mtg=False,
                     final_snapshots=False,
                     recording_performance=True,
                     recording_barcodes=False, compare_to_ref_barcode=False,
@@ -47,6 +49,7 @@ class Logger:
                     recording_raw=True,
                     final_snapshots=True,
                     recording_sums=True,
+                    static_mtg=False,
                     recording_performance=True,
                     recording_barcodes=False, compare_to_ref_barcode=False,
                     on_sums=True,
@@ -58,6 +61,7 @@ class Logger:
                     recording_raw=True,
                     final_snapshots=False,
                     recording_sums=True,
+                    static_mtg=True,
                     recording_performance=True,
                     recording_barcodes=True, compare_to_ref_barcode=False, 
                     on_sums=True,
@@ -68,6 +72,7 @@ class Logger:
                  output_variables={}, scenario={"default": 1}, time_step_in_hours=1,
                  logging_period_in_hours=1,
                  recording_sums=False, recording_raw=False, recording_mtg=False, recording_images=False, recording_off_screen=False,
+                 static_mtg=False,
                  recording_performance=False,
                  recording_shoot=False,
                  final_snapshots=False,
@@ -114,6 +119,7 @@ class Logger:
         if "root" not in self.data_structures.keys():
             recording_images = False
         self.recording_images = recording_images
+        self.static_mtg = static_mtg
         self.recording_off_screen = recording_off_screen
         self.final_snapshots = final_snapshots
         self.show_soil = show_soil
@@ -179,7 +185,8 @@ class Logger:
             self.simulation_performance = pd.DataFrame()
 
         if recording_images:
-            self.log_mtg_coordinates()
+            if not self.static_mtg:
+                self.log_mtg_coordinates()
             self.init_images_plotter()
 
         logging.basicConfig(filename=os.path.join(outputs_dirpath, '[RUNNING] simulation.log'), filemode='w',
@@ -256,7 +263,8 @@ class Logger:
 
     def __call__(self):
         self.current_step_start_time = self.elapsed_time
-        self.log_mtg_coordinates()
+        if not self.static_mtg:
+            self.log_mtg_coordinates()
 
         if self.simulation_time_in_hours > 0:
             log = f"\r[RUNNING] {self.simulation_time_in_hours} hours | step took {round(self.current_step_start_time - self.previous_step_start_time, 1)} s | {time.strftime('%H:%M:%S', time.gmtime(int(self.elapsed_time)))} since simulation started"
@@ -488,7 +496,7 @@ class Logger:
         root = next(root_gen)
 
         # We travel in the MTG from the root collar to the tips:
-        for vid in pre_order(g, root):
+        for vid in pre_order2(g, root):
             if vid == 1:
                 g.node(vid).dist_to_collar = 0
                 g.node(vid).order = 1
@@ -630,7 +638,8 @@ class Logger:
 
         if not self.recording_images and self.final_snapshots:
             print("[INFO] Saving a final snapshot...")
-            self.log_mtg_coordinates()
+            if not self.static_mtg:
+                self.log_mtg_coordinates()
             self.init_images_plotter()
             self.recording_images_with_pyvista()
 

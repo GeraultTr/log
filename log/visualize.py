@@ -14,7 +14,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 import tkinter as tk
 import numpy as np
 from time import sleep
-from openalea.mtg.traversal import pre_order
+from openalea.mtg.traversal import pre_order2
 
 
 def get_root_visitor():
@@ -516,7 +516,7 @@ def plot_mtg_alt(g, cmap_property, flow_property=True, root_hairs=False):
     tubes = []
     root_hairs_tubes = []
     root_hairs_opacity = []
-    for vid in pre_order(g, root):
+    for vid in pre_order2(g, root):
         if vid not in plotted_vids:
             root = g.Axis(vid)
             plotted_vids += root
