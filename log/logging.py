@@ -56,7 +56,7 @@ class Logger:
                     on_performance=True,
                     animate_raw_logs=True)
     
-    heavy_log = dict(recording_images=True, recording_off_screen=False, plotted_property="import_Nm", flow_property=True, show_soil=False,
+    heavy_log = dict(recording_images=True, recording_off_screen=False, plotted_property="Nm", flow_property=False, show_soil=False,
                     recording_mtg=True,
                     recording_raw=True,
                     final_snapshots=False,
@@ -72,7 +72,7 @@ class Logger:
                  output_variables={}, scenario={"default": 1}, time_step_in_hours=1,
                  logging_period_in_hours=1,
                  recording_sums=False, recording_raw=False, recording_mtg=False, recording_images=False, recording_off_screen=False,
-                 static_mtg=False,
+                 static_mtg=False, auto_camera_position=False,
                  recording_performance=False,
                  recording_shoot=False,
                  final_snapshots=False,
@@ -120,6 +120,7 @@ class Logger:
             recording_images = False
         self.recording_images = recording_images
         self.static_mtg = static_mtg
+        self.auto_camera_position = auto_camera_position
         self.recording_off_screen = recording_off_screen
         self.final_snapshots = final_snapshots
         self.show_soil = show_soil
@@ -203,6 +204,7 @@ class Logger:
         self.all_times_low, self.all_times_high = self.prop_mins[-1], self.prop_mins[-1]
         if self.all_times_low == 0:
             self.all_times_low = self.all_times_high / 1000
+        clim = [self.all_times_low, self.all_times_high]
 
         sizes = {"landscape": [1920, 1080], "portrait": [1088, 1920], "square": [1080, 1080],
                     "small_height": [960, 1280]}
@@ -212,15 +214,6 @@ class Logger:
 
         self.plotter = pv.Plotter(off_screen=not self.echo, window_size=sizes["portrait"], lighting="three lights")
         self.plotter.set_background("brown")
-
-        step_back_coefficient = 0.5
-        camera_coordinates = (step_back_coefficient, 0., 0.)
-        move_up_coefficient = 0.1
-        horizontal_aiming = (0., 0., 1.)
-        collar_position = (0., 0., -move_up_coefficient)
-        self.plotter.camera_position = [camera_coordinates,
-                                        collar_position,
-                                        horizontal_aiming]
 
         framerate = 10
         self.plotter.open_movie(os.path.join(self.root_images_dirpath, "root_movie.mp4"), framerate)
@@ -233,7 +226,7 @@ class Logger:
 
         # Then add initial states of plotted compartments
         root_system_mesh, color_property = plot_mtg_alt(self.data_structures["root"], cmap_property=self.plotted_property)
-        self.current_mesh = self.plotter.add_mesh(root_system_mesh, cmap="jet", clim=[1e-10, 6e-9], show_edges=False, log_scale=True)
+        self.current_mesh = self.plotter.add_mesh(root_system_mesh, cmap="jet", clim=clim, show_edges=False, log_scale=False)
         self.plot_text = self.plotter.add_text(f"Simulation starting...", position="upper_left")
         if "soil" in self.data_structures.keys() and self.show_soil:
             soil_grid = soil_voxels_mesh(self.data_structures["root"], self.data_structures["soil"],
@@ -246,6 +239,19 @@ class Logger:
             for vid in shoot_mesh.keys():
                 self.shoot_current_meshes[vid] = self.plotter.add_mesh(shoot_mesh[vid], color="green",
                                                                         show_edges=False, specular=1.)
+        
+        if self.auto_camera_position:
+            self.plotter.reset_camera()
+        else:
+            step_back_coefficient = 0.5
+            camera_coordinates = (step_back_coefficient, 0., 0.)
+            move_up_coefficient = 0.1
+            horizontal_aiming = (0., 0., 1.)
+            collar_position = (0., 0., -move_up_coefficient)
+            self.plotter.camera_position = [camera_coordinates,
+                                            collar_position,
+                                            horizontal_aiming]
+        
 
     def create_or_empty_directory(self, directory=""):
         if not os.path.exists(directory):
@@ -452,13 +458,12 @@ class Logger:
 
             self.plotter.remove_actor(self.current_mesh)
             self.plotter.remove_actor(self.plot_text)
-            # self.current_mesh = self.plotter.add_mesh(root_system_mesh, cmap="jet",
-            #                                           clim=[self.all_times_low, self.all_times_high], show_edges=False,
-            #                                           specular=1., log_scale=True)
+
             # TP, just to have a stable scale.
-            #clim = [1e-10, 1]
-            clim = [1e-10, 3e-9]
-            log_scale = True
+            #clim = [1e-10, 3e-9]
+            clim=[self.all_times_low, self.all_times_high]
+            log_scale = False
+
             self.current_mesh = self.plotter.add_mesh(root_system_mesh, cmap="jet",
                                                       clim=clim, show_edges=False,
                                                       specular=1., log_scale=log_scale)
