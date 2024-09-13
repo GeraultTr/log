@@ -20,7 +20,7 @@ from log.visualize import plot_mtg, plot_mtg_alt, soil_voxels_mesh, shoot_plantg
 
 class Logger:
 
-    light_log = dict(recording_images=False, recording_off_screen=False, plotted_property="import_Nm", show_soil=True,
+    light_log = dict(recording_images=False, recording_off_screen=False, plotted_property="import_Nm", flow_property=True, show_soil=True,
                     recording_mtg=False,
                     recording_raw=False,
                     final_snapshots=False,
@@ -32,7 +32,7 @@ class Logger:
                     on_performance=False,
                     animate_raw_logs=False)
     
-    medium_log_focus_images = dict(recording_images=True, recording_off_screen=True, plotted_property="import_Nm", show_soil=True,
+    medium_log_focus_images = dict(recording_images=True, recording_off_screen=True, plotted_property="import_Nm", flow_property=True, show_soil=True,
                     recording_mtg=False,
                     recording_raw=False,
                     recording_sums=True,
@@ -44,19 +44,19 @@ class Logger:
                     on_performance=True,
                     animate_raw_logs=False)
     
-    medium_log_focus_properties = dict(recording_images=False, recording_off_screen=True, plotted_property="nitrate_transporters_affinity_factor", flow_property=False, show_soil=False,
+    medium_log_focus_properties = dict(recording_images=False, recording_off_screen=False, plotted_property="nitrate_transporters_affinity_factor", flow_property=False, show_soil=False,
                     recording_mtg=False,
                     recording_raw=True,
                     final_snapshots=True,
                     recording_sums=True,
-                    static_mtg=False,
+                    static_mtg=True,
                     recording_performance=True,
                     recording_barcodes=False, compare_to_ref_barcode=False,
                     on_sums=True,
                     on_performance=True,
                     animate_raw_logs=True)
     
-    heavy_log = dict(recording_images=True, recording_off_screen=False, plotted_property="Nm", flow_property=False, show_soil=False,
+    heavy_log = dict(recording_images=True, recording_off_screen=False, plotted_property="import_Nm", flow_property=True, show_soil=False,
                     recording_mtg=True,
                     recording_raw=True,
                     final_snapshots=False,
@@ -72,7 +72,7 @@ class Logger:
                  output_variables={}, scenario={"default": 1}, time_step_in_hours=1,
                  logging_period_in_hours=1,
                  recording_sums=False, recording_raw=False, recording_mtg=False, recording_images=False, recording_off_screen=False,
-                 static_mtg=False, auto_camera_position=False,
+                 static_mtg=False, auto_camera_position=False, imposed_clim=True,
                  recording_performance=False,
                  recording_shoot=False,
                  final_snapshots=False,
@@ -101,6 +101,7 @@ class Logger:
                 print("[WARNING] Unknown data structure has been passed to logger")
 
         self.models = model_instance.models
+        self.fields = {f.name: f.metadata for model in self.models for f in fields(model) if f.metadata["variable_type"] == "state_variable"}
         self.outputs_dirpath = outputs_dirpath
         self.output_variables = output_variables
         self.scenario = scenario
@@ -121,6 +122,7 @@ class Logger:
         self.recording_images = recording_images
         self.static_mtg = static_mtg
         self.auto_camera_position = auto_camera_position
+        self.imposed_clim=imposed_clim
         self.recording_off_screen = recording_off_screen
         self.final_snapshots = final_snapshots
         self.show_soil = show_soil
@@ -204,7 +206,12 @@ class Logger:
         self.all_times_low, self.all_times_high = self.prop_mins[-1], self.prop_mins[-1]
         if self.all_times_low == 0:
             self.all_times_low = self.all_times_high / 1000
-        clim = [self.all_times_low, self.all_times_high]
+        
+        if isinstance(self.imposed_clim, bool):
+            if self.imposed_clim:
+                clim = [self.fields[self.plotted_property]["min_value"], self.fields[self.plotted_property]["max_value"]]
+            else:
+                clim = [self.all_times_low, self.all_times_high]
 
         sizes = {"landscape": [1920, 1080], "portrait": [1088, 1920], "square": [1080, 1080],
                     "small_height": [960, 1280]}
@@ -252,7 +259,6 @@ class Logger:
                                             collar_position,
                                             horizontal_aiming]
         
-
     def create_or_empty_directory(self, directory=""):
         if not os.path.exists(directory):
             # We create it:
@@ -438,8 +444,7 @@ class Logger:
                 color_property.remove(0.)
             self.flow_property
             self.plotting_root_hairs=True
-            #if self.plotting_root_hairs:
-                
+
             # Accounts for smooth color bar transitions for videos.
             self.prop_mins = self.prop_mins[1:] + [min(color_property)]
             self.prop_maxs = self.prop_maxs[1:] + [max(color_property)]
@@ -459,9 +464,13 @@ class Logger:
             self.plotter.remove_actor(self.current_mesh)
             self.plotter.remove_actor(self.plot_text)
 
-            # TP, just to have a stable scale.
-            #clim = [1e-10, 3e-9]
-            clim=[self.all_times_low, self.all_times_high]
+            if isinstance(self.imposed_clim, bool):
+                if self.imposed_clim and isinstance(self.fields[self.plotted_property]["min_value"], float):
+                    clim = [self.fields[self.plotted_property]["min_value"],
+                            self.fields[self.plotted_property]["max_value"]]
+                else:
+                    clim = [self.all_times_low, self.all_times_high]
+
             log_scale = False
 
             self.current_mesh = self.plotter.add_mesh(root_system_mesh, cmap="jet",
