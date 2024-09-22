@@ -32,7 +32,7 @@ class Logger:
                     animate_raw_logs=False,
                     on_shoot_logs=False)
     
-    medium_log_focus_images = dict(recording_images=True, recording_off_screen=True, plotted_property="import_Nm", flow_property=True, show_soil=True,
+    medium_log_focus_images = dict(recording_images=True, recording_off_screen=False, plotted_property="C_hexose_root", flow_property=False, show_soil=True,
                     recording_mtg=False,
                     recording_raw=False,
                     recording_sums=True,
@@ -43,7 +43,7 @@ class Logger:
                     on_sums=True,
                     on_performance=True,
                     animate_raw_logs=False,
-                    on_shoot_logs=False)
+                    on_shoot_logs=True)
     
     medium_log_focus_properties = dict(recording_images=False, recording_off_screen=False, plotted_property="nitrate_transporters_affinity_factor", flow_property=False, show_soil=False,
                     recording_mtg=False,
@@ -58,20 +58,21 @@ class Logger:
                     animate_raw_logs=True,
                     on_shoot_logs=False)
     
-    heavy_log = dict(recording_images=True, recording_off_screen=False, plotted_property="import_Nm", flow_property=True, show_soil=False,
+    heavy_log = dict(recording_images=True, recording_off_screen=False, static_mtg=True,
+                     plotted_property="Nm", flow_property=False, show_soil=True,
                     recording_mtg=True,
                     recording_raw=True,
                     final_snapshots=False,
                     recording_sums=True,
                     recording_performance=True,
-                    recording_shoot=True,
-                    recording_barcodes=True, compare_to_ref_barcode=False, 
+                    recording_shoot=False,
+                    recording_barcodes=False, compare_to_ref_barcode=False,
                     on_sums=True,
                     on_performance=True,
                     animate_raw_logs=True,
-                    on_shoot_logs=True)
+                    on_shoot_logs=False)
 
-    def __init__(self, model_instance, outputs_dirpath="",
+    def __init__(self, model_instance, components, outputs_dirpath="",
                  output_variables={}, scenario={"default": 1}, time_step_in_hours=1,
                  logging_period_in_hours=1,
                  recording_sums=False, recording_raw=False, recording_mtg=False, recording_images=False, recording_off_screen=False,
@@ -103,8 +104,8 @@ class Logger:
             else:
                 print("[WARNING] Unknown data structure has been passed to logger")
 
-        self.models = model_instance.models
-        self.fields = {f.name: f.metadata for model in self.models for f in fields(model) if f.metadata["variable_type"] == "state_variable"}
+        self.components = components
+        self.fields = {f.name: f.metadata for model in self.components for f in fields(model) if f.metadata["variable_type"] == "state_variable"}
         self.outputs_dirpath = outputs_dirpath
         self.output_variables = output_variables
         self.scenario = scenario
@@ -165,7 +166,7 @@ class Logger:
             self.create_or_empty_directory(self.shoot_properties_dirpath)
 
         if self.output_variables == {}:
-            for model in self.models:
+            for model in self.components:
                 self.summable_output_variables += model.extensive_variables
                 self.meanable_output_variables += model.intensive_variables
                 self.plant_scale_state += model.plant_scale_state
@@ -497,6 +498,9 @@ class Logger:
                     self.plotter.remove_actor(self.shoot_current_meshes[vid])
                 self.shoot_current_meshes[vid] = self.plotter.add_mesh(shoot_meshes[vid], color="lightgreen",
                                                                        show_edges=False, specular=1.)
+
+        if self.auto_camera_position:
+            self.plotter.reset_camera()
 
         self.plotter.update()
         self.plotter.write_frame()
