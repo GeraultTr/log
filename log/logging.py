@@ -59,7 +59,7 @@ class Logger:
                     on_shoot_logs=False)
     
     heavy_log = dict(recording_images=True, recording_off_screen=False, static_mtg=True,
-                     plotted_property="Nm", flow_property=False, show_soil=True,
+                     plotted_property="Nm", flow_property=False, show_soil=False,
                     recording_mtg=True,
                     recording_raw=True,
                     final_snapshots=False,

@@ -524,7 +524,10 @@ def plot_mtg_alt(g, cmap_property, flow_property=True, root_hairs=False):
                 parent = g.Father(vid)
                 grandparent = g.Father(parent)
                 # We need a minimum of two anchors for the new axis
-                root = [grandparent, parent] + root
+                if parent:
+                    root = [parent] + root
+                if grandparent:
+                    root = [grandparent] + root
             
             points = np.array([[props["x2"][v], props["y2"][v], props["z2"][v]] for v in root])
             line = lines_from_points(points)
