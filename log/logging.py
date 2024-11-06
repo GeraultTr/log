@@ -15,7 +15,7 @@ from gudhi import bottleneck_distance
 
 from openalea.mtg.traversal import pre_order2, post_order
 from openalea.mtg import turtle as turt
-from log.visualize import plot_mtg, plot_mtg_alt, soil_voxels_mesh, shoot_plantgl_to_mesh
+from log.visualize import plot_mtg, plot_mtg_alt, soil_voxels_mesh, shoot_plantgl_to_mesh, VertexPicker
 
 
 class Logger:
@@ -58,8 +58,8 @@ class Logger:
                     animate_raw_logs=True,
                     on_shoot_logs=False)
     
-    heavy_log = dict(recording_images=True, recording_off_screen=False, static_mtg=True,
-                     plotted_property="Nm", flow_property=False, show_soil=False,
+    heavy_log = dict(recording_images=True, recording_off_screen=False, static_mtg=False,
+                     plotted_property="import_Nm", flow_property=True, show_soil=False, imposed_clim=False,
                     recording_mtg=True,
                     recording_raw=True,
                     final_snapshots=False,
@@ -173,7 +173,7 @@ class Logger:
                 available_inputs = [i for i in model.inputs if
                                     i in self.props.keys()]  # To prevent getting inputs that are not provided neither from another model nor mtg
                 self.output_variables.update(
-                    {f.name: f.metadata for f in fields(model) if f.name in model.state_variables + available_inputs + ["struct_mass"]})
+                    {f.name: f.metadata for f in fields(model) if f.name in model.state_variables + model.plant_scale_state + available_inputs + ["struct_mass"]})
                 self.units_for_outputs.update({f.name: f.metadata["unit"] for f in fields(model) if
                                                f.name in self.summable_output_variables + self.meanable_output_variables + self.plant_scale_state})
 
@@ -204,7 +204,7 @@ class Logger:
         self.simulation_time_in_hours = 0
 
 
-    def init_images_plotter(self):
+    def init_images_plotter(self, background_color="white"):
         self.prop_mins = [None for k in range(9)] + [min(self.props["root"][self.plotted_property].values())]
         self.prop_maxs = [None for k in range(9)] + [max(self.props["root"][self.plotted_property].values())]
         self.all_times_low, self.all_times_high = self.prop_mins[-1], self.prop_mins[-1]
@@ -224,7 +224,7 @@ class Logger:
             pv.start_xvfb()
 
         self.plotter = pv.Plotter(off_screen=not self.echo, window_size=sizes["portrait"], lighting="three lights")
-        self.plotter.set_background("brown")
+        self.plotter.set_background(background_color)
 
         framerate = 10
         self.plotter.open_movie(os.path.join(self.root_images_dirpath, "root_movie.mp4"), framerate)
@@ -236,12 +236,14 @@ class Logger:
         # self.plotter.add_text("1 cm", position="upper_right")
 
         # Then add initial states of plotted compartments
-        root_system_mesh, color_property = plot_mtg_alt(self.data_structures["root"], cmap_property=self.plotted_property)
+        root_system_mesh, color_property, root_hair_mesh = plot_mtg_alt(self.data_structures["root"], cmap_property=self.plotted_property, root_hairs=False)
         self.current_mesh = self.plotter.add_mesh(root_system_mesh, cmap="jet", clim=clim, show_edges=False, log_scale=False)
+        if root_hair_mesh:
+            self.root_hair_current_mesh = self.plotter.add_mesh(root_hair_mesh, cmap="jet", opacity=0.05)
         self.plot_text = self.plotter.add_text(f"Simulation starting...", position="upper_left")
         if "soil" in self.data_structures.keys() and self.show_soil:
             soil_grid = soil_voxels_mesh(self.data_structures["root"], self.data_structures["soil"],
-                                            cmap_property="C_hexose_soil")
+                                            cmap_property="water_potential_soil")
             self.soil_grid_in_scene = self.plotter.add_mesh(soil_grid, cmap="hot", show_edges=False, specular=1.,
                                                             opacity=0.1)
         if "shoot" in self.data_structures.keys():
@@ -297,8 +299,9 @@ class Logger:
         if self.recording_barcodes:
             self.barcode_from_mtg()
 
-        if self.recording_images and self.simulation_time_in_hours % 100 == 0.:
-            self.plotter.screenshot(os.path.join(self.outputs_dirpath, f"root_images/snapshot_{self.simulation_time_in_hours}.png"))
+        if self.recording_images and self.simulation_time_in_hours % self.logging_period_in_hours == 0.:
+            self.plotter.screenshot(os.path.join(self.outputs_dirpath, f"root_images/snapshot_{self.simulation_time_in_hours}.png"),
+                                    transparent_background=True, scale=5)
 
         # Only the costly logging operations are restricted here
         if self.simulation_time_in_hours % self.logging_period_in_hours == 0:
@@ -443,11 +446,9 @@ class Logger:
     def recording_images_with_pyvista(self):
         if "root" in self.data_structures.keys():
             # TODO : step back according to max(||x2-x1||, ||y2-y1||, ||z2-z1||)
-            root_system_mesh, color_property = plot_mtg_alt(self.data_structures["root"], cmap_property=self.plotted_property, flow_property=self.flow_property)
+            root_system_mesh, color_property, root_hair_mesh = plot_mtg_alt(self.data_structures["root"], cmap_property=self.plotted_property, flow_property=self.flow_property, root_hairs=False)
             if 0. in color_property:
                 color_property.remove(0.)
-            self.flow_property
-            self.plotting_root_hairs=True
 
             # Accounts for smooth color bar transitions for videos.
             self.prop_mins = self.prop_mins[1:] + [min(color_property)]
@@ -480,6 +481,10 @@ class Logger:
             self.current_mesh = self.plotter.add_mesh(root_system_mesh, cmap="jet",
                                                       clim=clim, show_edges=False,
                                                       specular=1., log_scale=log_scale)
+            if root_hair_mesh:
+                self.plotter.remove_actor(self.root_hair_current_mesh)
+                self.root_hair_current_mesh = self.plotter.add_mesh(root_hair_mesh, cmap="Greys", opacity=0.05)
+
             # TODO : Temporary, just because the meteo file begins at PAR peak
             self.plot_text = self.plotter.add_text(
                 f" day {int((self.simulation_time_in_hours + 12) / 24)} : {(self.simulation_time_in_hours + 12) % 24} h",
@@ -488,7 +493,7 @@ class Logger:
                 soil_grid = soil_voxels_mesh(self.data_structures["root"], self.data_structures["soil"],
                                              cmap_property="C_mineralN_soil")
                 self.plotter.remove_actor(self.soil_grid_in_scene)
-                self.soil_grid_in_scene = self.plotter.add_mesh(soil_grid, cmap="hot", show_edges=False, specular=1.,
+                self.soil_grid_in_scene = self.plotter.add_mesh(soil_grid, cmap="cool", show_edges=False, specular=1.,
                                                                 opacity=0.1)
 
         if "shoot" in self.data_structures.keys():
@@ -663,6 +668,15 @@ class Logger:
                 self.log_mtg_coordinates()
             self.init_images_plotter()
             self.recording_images_with_pyvista()
+
+        final_interactive_picking = True
+        if self.recording_images and final_interactive_picking:
+            # We are using the already plotted mesh to activate the picker and enable interactive mode
+            picker = VertexPicker(g=self.data_structures["root"], target_property="radius")
+            picked_actor = self.plotter.enable_point_picking(callback=picker, picker='volume')
+
+            self.plotter.reset_camera()
+            self.plotter.show(interactive_update=False)
 
         if not self.recording_mtg and self.final_snapshots:
             print("[INFO] Saving the final state of the MTG...")

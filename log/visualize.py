@@ -534,7 +534,7 @@ def plot_mtg_alt(g, cmap_property, flow_property=True, root_hairs=False):
 
             if root_hairs:
                 root_hairs_line = line
-                root_hairs_line["living_root_hairs_struct_mass"] = [props["living_root_hairs_struct_mass"][v] for v in root]
+                #root_hairs_line["living_root_hairs_struct_mass"] = [props["living_root_hairs_struct_mass"][v] for v in root]
                 root_hairs_line["radius"] = [props["radius"][v] + props["root_hair_length"][v] for v in root]
                 root_hairs_tubes += [root_hairs_line.tube(scalars="radius", absolute=True)]
             
@@ -560,7 +560,7 @@ def plot_mtg_alt(g, cmap_property, flow_property=True, root_hairs=False):
         return root_system, color_property, root_hairs_system
     
     else:
-        return root_system, color_property
+        return root_system, color_property, None
 
 
 
@@ -603,4 +603,27 @@ def shoot_plantgl_to_mesh(g, cmap_property="", scale=0.4):
     return shoot_mesh_dict
 
 
+class VertexPicker:
+    """
+    Pyvista vertex picker
+    """
+    def __init__(self, g, target_property="radius"):
+        self.g = g
+        self.props = g.properties()
+        self.target_property = target_property
+
+    # Define the callback for when an object is picked
+    def __call__(self, picked_coordinates):
+        x, y, z = picked_coordinates
+        distances = {}
+        for vid in self.g.vertices():
+            if vid != 0:
+                distance = self.compute_vertex_distance(x, y, z, self.props["x2"][vid], self.props["y2"][vid], self.props["z2"][vid])
+                distances[vid] = distance
+
+        picked = min(distances, key=distances.get)
+        print(f"Picked vertex {picked} (+{self.g.children(picked)} -{self.g.parent(picked)}), distance_from_tip = {self.props['distance_from_tip'][picked]}, {self.target_property} = {self.props[self.target_property][picked]}")
+
+    def compute_vertex_distance(self, x1, y1, z1, x2, y2, z2):
+        return ((x1-x2)**2 + (y1-y2)**2 + (z1-z2)**2)**0.5
     
