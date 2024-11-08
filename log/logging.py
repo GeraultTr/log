@@ -59,7 +59,7 @@ class Logger:
                     on_shoot_logs=False)
     
     heavy_log = dict(recording_images=True, recording_off_screen=False, static_mtg=False,
-                     plotted_property="import_Nm", flow_property=True, show_soil=False, imposed_clim=False,
+                     plotted_property="Nm", flow_property=False, show_soil=True, imposed_clim=False,
                     recording_mtg=True,
                     recording_raw=True,
                     final_snapshots=False,
@@ -145,6 +145,7 @@ class Logger:
             self.persistent_barcodes = {}
                 
         self.echo = echo
+        self.log = ""
         # TODO : add a scenario named folder
         self.root_images_dirpath = os.path.join(self.outputs_dirpath, "root_images")
         self.MTG_files_dirpath = os.path.join(self.outputs_dirpath, "MTG_files")
@@ -285,10 +286,10 @@ class Logger:
             self.log_mtg_coordinates()
 
         if self.simulation_time_in_hours > 0:
-            log = f"\r[RUNNING] {self.simulation_time_in_hours} hours | step took {round(self.current_step_start_time - self.previous_step_start_time, 1)} s | {time.strftime('%H:%M:%S', time.gmtime(int(self.elapsed_time)))} since simulation started"
+            self.log = f"\r[RUNNING] {self.simulation_time_in_hours} hours | step took {round(self.current_step_start_time - self.previous_step_start_time, 1)} s"
             if self.echo:
-                sys.stdout.write(log)
-            logging.info(log)
+                sys.stdout.write(self.log)
+            logging.info(self.log + f"| {time.strftime('%H:%M:%S', time.gmtime(int(self.elapsed_time)))} since simulation started")
 
         if self.recording_sums:
             self.recording_summed_MTG_properties_to_csv()
@@ -322,15 +323,18 @@ class Logger:
 
     def time_and_run(self, func_name="run"):
         simulation_time_in_hours = self.simulation_time_in_hours
-
+        log = self.log
+        echo = self.echo
         self = self.model_instance
         steps = inspect.getsource(getattr(self, func_name)).replace("    ", "").split("\n")[1:]
         steps = [step for step in steps if "#" not in step and len(step) != 0]
         steps_times = {k: 0. for k in steps}
         loop_start = time.time()
         for step in steps:
+            if echo:
+                sys.stdout.write(log + f" | current : {step}" + " "*80)
             t_start = time.time()
-            exec (step)
+            exec(step)
             steps_times[step] = time.time() - t_start
         total_time = time.time() - loop_start
         for step in steps:
@@ -672,11 +676,13 @@ class Logger:
         final_interactive_picking = True
         if self.recording_images and final_interactive_picking:
             # We are using the already plotted mesh to activate the picker and enable interactive mode
-            picker = VertexPicker(g=self.data_structures["root"], target_property="radius")
-            picked_actor = self.plotter.enable_point_picking(callback=picker, picker='volume')
+            target_property = input("Which property? : ")
+            if target_property != "":
+                picker = VertexPicker(g=self.data_structures["root"], target_property=target_property)
+                picked_actor = self.plotter.enable_point_picking(callback=picker, picker='volume')
 
-            self.plotter.reset_camera()
-            self.plotter.show(interactive_update=False)
+                self.plotter.reset_camera()
+                self.plotter.show(interactive_update=False)
 
         if not self.recording_mtg and self.final_snapshots:
             print("[INFO] Saving the final state of the MTG...")

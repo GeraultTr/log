@@ -589,7 +589,7 @@ def soil_voxels_mesh(g, voxels, cmap_property):
     return soil_grid
 
 
-def shoot_plantgl_to_mesh(g, cmap_property="", scale=0.4):
+def shoot_plantgl_to_mesh(g, cmap_property="", scale=1.):
     geometries = g.property("geometry")
     shoot_mesh_dict = {}
 
@@ -598,7 +598,10 @@ def shoot_plantgl_to_mesh(g, cmap_property="", scale=0.4):
         geom.apply(t)
         mesh = t.discretization
         tmesh = trimesh.Trimesh(mesh.pointList, mesh.indexList)
-        shoot_mesh_dict[vid] = pv.wrap(tmesh).scale([scale, scale, scale])
+        if vid == 19:
+            shoot_mesh_dict[vid] = pv.wrap(tmesh).scale([scale/2, scale/2, scale])
+        else:
+            shoot_mesh_dict[vid] = pv.wrap(tmesh).scale([scale, scale, scale])
 
     return shoot_mesh_dict
 
