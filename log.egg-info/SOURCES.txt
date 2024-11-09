@@ -1,5 +1,6 @@
 README.md
 setup.py
+log/__init__.py
 log/logging.py
 log/visualize.py
 log.egg-info/PKG-INFO

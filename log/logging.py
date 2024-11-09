@@ -17,6 +17,9 @@ from openalea.mtg.traversal import pre_order2, post_order
 from openalea.mtg import turtle as turt
 from log.visualize import plot_mtg, plot_mtg_alt, soil_voxels_mesh, shoot_plantgl_to_mesh, VertexPicker
 
+usual_clims = dict(
+    Nm=[1e-2, 1.]
+)
 
 class Logger:
 
@@ -58,8 +61,8 @@ class Logger:
                     animate_raw_logs=True,
                     on_shoot_logs=False)
     
-    heavy_log = dict(recording_images=True, recording_off_screen=False, static_mtg=False,
-                     plotted_property="Nm", flow_property=False, show_soil=True, imposed_clim=False,
+    heavy_log = dict(recording_images=True, recording_off_screen=True, auto_camera_position=False, static_mtg=False,
+                     plotted_property="Nm", flow_property=False, show_soil=True, imposed_clim=usual_clims["Nm"],
                     recording_mtg=True,
                     recording_raw=True,
                     final_snapshots=False,
@@ -217,6 +220,8 @@ class Logger:
                 clim = [self.fields[self.plotted_property]["min_value"], self.fields[self.plotted_property]["max_value"]]
             else:
                 clim = [self.all_times_low, self.all_times_high]
+        else:
+            clim = self.imposed_clim
 
         sizes = {"landscape": [1920, 1080], "portrait": [1088, 1920], "square": [1080, 1080],
                     "small_height": [960, 1280]}
@@ -257,10 +262,10 @@ class Logger:
         if self.auto_camera_position:
             self.plotter.reset_camera()
         else:
-            step_back_coefficient = 0.5
+            step_back_coefficient = 0.9
             camera_coordinates = (step_back_coefficient, 0., 0.)
             move_up_coefficient = 0.1
-            horizontal_aiming = (0., 0., 1.)
+            horizontal_aiming = (0., 0., 1.5)
             collar_position = (0., 0., -move_up_coefficient)
             self.plotter.camera_position = [camera_coordinates,
                                             collar_position,
@@ -287,8 +292,8 @@ class Logger:
 
         if self.simulation_time_in_hours > 0:
             self.log = f"\r[RUNNING] {self.simulation_time_in_hours} hours | step took {round(self.current_step_start_time - self.previous_step_start_time, 1)} s"
-            if self.echo:
-                sys.stdout.write(self.log)
+            # if self.echo:
+            #     sys.stdout.write(self.log)
             logging.info(self.log + f"| {time.strftime('%H:%M:%S', time.gmtime(int(self.elapsed_time)))} since simulation started")
 
         if self.recording_sums:
@@ -479,6 +484,8 @@ class Logger:
                             self.fields[self.plotted_property]["max_value"]]
                 else:
                     clim = [self.all_times_low, self.all_times_high]
+            else:
+                clim = self.imposed_clim
 
             log_scale = False
 
@@ -495,7 +502,7 @@ class Logger:
                 position="upper_left")
             if "soil" in self.data_structures.keys() and self.show_soil:
                 soil_grid = soil_voxels_mesh(self.data_structures["root"], self.data_structures["soil"],
-                                             cmap_property="C_mineralN_soil")
+                                             cmap_property="mineral_N_net_mineralization")
                 self.plotter.remove_actor(self.soil_grid_in_scene)
                 self.soil_grid_in_scene = self.plotter.add_mesh(soil_grid, cmap="cool", show_edges=False, specular=1.,
                                                                 opacity=0.1)
@@ -674,7 +681,7 @@ class Logger:
             self.recording_images_with_pyvista()
 
         final_interactive_picking = True
-        if self.recording_images and final_interactive_picking:
+        if self.recording_images and final_interactive_picking and not self.recording_off_screen:
             # We are using the already plotted mesh to activate the picker and enable interactive mode
             target_property = input("Which property? : ")
             if target_property != "":
