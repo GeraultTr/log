@@ -18,7 +18,8 @@ from openalea.mtg import turtle as turt
 from log.visualize import plot_mtg, plot_mtg_alt, soil_voxels_mesh, shoot_plantgl_to_mesh, VertexPicker
 
 usual_clims = dict(
-    Nm=[1e-2, 1.]
+    Nm=[1e-3, 1.],
+    hexose_exudation=[1e-13, 1e-9]
 )
 
 class Logger:
@@ -26,7 +27,7 @@ class Logger:
     light_log = dict(recording_images=False, recording_off_screen=False, plotted_property="import_Nm", flow_property=True, show_soil=True,
                     recording_mtg=False,
                     recording_raw=False,
-                    final_snapshots=False,
+                    final_snapshots=True,
                     recording_performance=True,
                     recording_shoot=True,
                     recording_barcodes=False, compare_to_ref_barcode=False,
@@ -62,18 +63,17 @@ class Logger:
                     on_shoot_logs=False)
     
     heavy_log = dict(recording_images=True, recording_off_screen=True, auto_camera_position=False, static_mtg=False,
-                     plotted_property="Nm", flow_property=False, show_soil=True, imposed_clim=usual_clims["Nm"],
-                    recording_mtg=True,
+                     plotted_property="hexose_exudation", flow_property=True, show_soil=False, imposed_clim=usual_clims["hexose_exudation"],
+                    recording_mtg=False,
                     recording_raw=True,
                     final_snapshots=False,
                     recording_sums=True,
                     recording_performance=True,
-                    recording_shoot=False,
                     recording_barcodes=False, compare_to_ref_barcode=False,
                     on_sums=True,
                     on_performance=True,
                     animate_raw_logs=True,
-                    on_shoot_logs=False)
+                    on_shoot_logs=True)
 
     def __init__(self, model_instance, components, outputs_dirpath="",
                  output_variables={}, scenario={"default": 1}, time_step_in_hours=1,
@@ -263,13 +263,15 @@ class Logger:
             self.plotter.reset_camera()
         else:
             step_back_coefficient = 0.9
-            camera_coordinates = (step_back_coefficient, 0., 0.)
-            move_up_coefficient = 0.1
-            horizontal_aiming = (0., 0., 1.5)
+            move_up_coefficient = 0.12
+            tilt_down_coefficient = 0.2 * 0
+            camera_coordinates = (step_back_coefficient, 0., tilt_down_coefficient)
+            horizontal_aiming = (0., 0., 1)
             collar_position = (0., 0., -move_up_coefficient)
             self.plotter.camera_position = [camera_coordinates,
                                             collar_position,
                                             horizontal_aiming]
+            #self.plotter.reset_camera()
         
     def create_or_empty_directory(self, directory=""):
         if not os.path.exists(directory):
@@ -487,7 +489,7 @@ class Logger:
             else:
                 clim = self.imposed_clim
 
-            log_scale = False
+            log_scale = True
 
             self.current_mesh = self.plotter.add_mesh(root_system_mesh, cmap="jet",
                                                       clim=clim, show_edges=False,
