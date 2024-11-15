@@ -15,7 +15,7 @@ from gudhi import bottleneck_distance
 
 from openalea.mtg.traversal import pre_order2, post_order
 from openalea.mtg import turtle as turt
-from log.visualize import plot_mtg, plot_mtg_alt, soil_voxels_mesh, shoot_plantgl_to_mesh, VertexPicker
+from log.visualize import plot_mtg, plot_mtg_alt, soil_voxels_mesh, shoot_plantgl_to_mesh, VertexPicker, export_scene_to_gltf
 
 usual_clims = dict(
     Nm=[1e-3, 1.],
@@ -522,6 +522,14 @@ class Logger:
 
         self.plotter.update()
         self.plotter.write_frame()
+
+        export_3D = True
+        if export_3D:
+            export_scene_to_gltf(output_path=os.path.join(self.root_images_dirpath, f"{self.simulation_time_in_hours}.gltf"),
+                                 plotter=self.plotter, clim=clim)
+
+        # This is required since the dictionnary is not emptied when using plotter.remove_actor. However this is not a problem to the use of the remove_actor in the renderer for next time_step.
+        self.plotter.renderer.actors.clear()
 
     def write_to_disk(self, xarray_list):
         interstitial_dataset = xr.concat(xarray_list, dim="t")
