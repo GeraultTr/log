@@ -307,15 +307,13 @@ class Logger:
         if self.recording_barcodes:
             self.barcode_from_mtg()
 
-        if self.recording_images and self.simulation_time_in_hours % self.logging_period_in_hours == 0.:
-            self.plotter.screenshot(os.path.join(self.outputs_dirpath, f"root_images/snapshot_{self.simulation_time_in_hours}.png"),
-                                    transparent_background=True, scale=5)
-
         # Only the costly logging operations are restricted here
         if self.simulation_time_in_hours % self.logging_period_in_hours == 0:
             if self.recording_mtg:
                 self.recording_mtg_files()
             if self.recording_images:
+                self.plotter.screenshot(os.path.join(self.outputs_dirpath, f"root_images/snapshot_{self.simulation_time_in_hours}.png"),
+                                    transparent_background=True, scale=5)
                 self.recording_images_with_pyvista()
 
         self.simulation_time_in_hours += self.time_step_in_hours
@@ -371,7 +369,7 @@ class Logger:
                 emerged_vids.remove(1)
                 for var in self.summable_output_variables:
                     if var in prop.keys():
-                        step_plant_scale.update({var: sum([prop[var][v] for v in emerged_vids])})
+                        step_plant_scale.update({var: sum([prop[var][v] for v in emerged_vids if v in prop[var]])})
                 for var in self.meanable_output_variables:
                     if var in prop.keys():
                         if len(emerged_vids) > 0:

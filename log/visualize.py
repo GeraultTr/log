@@ -646,9 +646,10 @@ def export_scene_to_gltf(output_path, plotter, clim, colormap="jet"):
         
             # Check if the data is already PolyData
             if isinstance(data, pv.PolyData):
+                # We suppose this is leaves in this case
                 polydata = data
                 # Add the PolyData with colors to the export plotter
-                export_plotter.add_mesh(polydata, cmap=colormap, clim=clim, specular=1., log_scale=True)
+                export_plotter.add_mesh(polydata, color="lightgreen", specular=None)
 
             elif isinstance(data, pv.MultiBlock):
                 if plotted_multiblocks < 1:
@@ -662,7 +663,7 @@ def export_scene_to_gltf(output_path, plotter, clim, colormap="jet"):
                                 polydata = block
 
                             # Add the PolyData with colors to the export plotter
-                            export_plotter.add_mesh(polydata, cmap=colormap, clim=clim, specular=1., log_scale=True)
+                            export_plotter.add_mesh(polydata, cmap=colormap, clim=clim, specular=None, log_scale=True)
                             plotted_multiblocks += 1
 
             else:
