@@ -403,7 +403,8 @@ class Logger:
 
     def recording_raw_MTG_properties_in_xarray(self):
         self.log_xarray += [self.mtg_to_dataset(variables=self.output_variables, time=self.simulation_time_in_hours)]
-        if sys.getsizeof(self.log_xarray) > 10000:
+        # 10000 corresponds to 14Gb on disk, so should be to 2000 when testing several scenarios to avoid saturating memory
+        if sys.getsizeof(self.log_xarray) > 2000:
             print("")
             print("[INFO] Merging stored properties data in one xarray dataset...", flush=True)
             self.write_to_disk(self.log_xarray)
@@ -521,7 +522,7 @@ class Logger:
         self.plotter.update()
         self.plotter.write_frame()
 
-        export_3D = True
+        export_3D = False
         if export_3D:
             export_scene_to_gltf(output_path=os.path.join(self.root_images_dirpath, f"{self.simulation_time_in_hours}.gltf"),
                                  plotter=self.plotter, clim=clim)
