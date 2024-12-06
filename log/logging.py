@@ -24,16 +24,18 @@ usual_clims = dict(
 
 class Logger:
 
-    light_log = dict(recording_images=False, recording_off_screen=False, plotted_property="import_Nm", flow_property=True, show_soil=True,
+    light_log = dict(recording_images=False, recording_off_screen=True, auto_camera_position=False, static_mtg=False,
+                    plotted_property="hexose_exudation", flow_property=True, show_soil=False, imposed_clim=usual_clims["hexose_exudation"],
                     recording_mtg=False,
                     recording_raw=False,
                     final_snapshots=True,
+                    export_3D_scene=True,
+                    recording_sums=True,
                     recording_performance=True,
-                    recording_shoot=True,
                     recording_barcodes=False, compare_to_ref_barcode=False,
-                    on_sums=False,
-                    on_performance=False,
-                    animate_raw_logs=False,
+                    on_sums=True,
+                    on_performance=True,
+                    animate_raw_logs=True,
                     on_shoot_logs=False)
     
     medium_log_focus_images = dict(recording_images=True, recording_off_screen=False, plotted_property="C_hexose_root", flow_property=False, show_soil=True,
@@ -49,13 +51,14 @@ class Logger:
                     animate_raw_logs=False,
                     on_shoot_logs=True)
     
-    medium_log_focus_properties = dict(recording_images=False, recording_off_screen=False, plotted_property="nitrate_transporters_affinity_factor", flow_property=False, show_soil=False,
+    medium_log_focus_properties = dict(recording_images=False, recording_off_screen=True, auto_camera_position=False, static_mtg=False,
+                    plotted_property="hexose_exudation", flow_property=True, show_soil=False, imposed_clim=usual_clims["hexose_exudation"],
                     recording_mtg=False,
                     recording_raw=True,
                     final_snapshots=True,
+                    export_3D_scene=True,
                     recording_sums=True,
                     recording_performance=True,
-                    recording_shoot=True,
                     recording_barcodes=False, compare_to_ref_barcode=False,
                     on_sums=True,
                     on_performance=True,
@@ -66,7 +69,8 @@ class Logger:
                      plotted_property="hexose_exudation", flow_property=True, show_soil=False, imposed_clim=usual_clims["hexose_exudation"],
                     recording_mtg=False,
                     recording_raw=True,
-                    final_snapshots=False,
+                    final_snapshots=True,
+                    export_3D_scene=True,
                     recording_sums=True,
                     recording_performance=True,
                     recording_barcodes=False, compare_to_ref_barcode=False,
@@ -83,6 +87,7 @@ class Logger:
                  recording_performance=False,
                  recording_shoot=False,
                  final_snapshots=False,
+                 export_3D_scene=False,
                  plotted_property="hexose_exudation", flow_property=False, show_soil=False,
                  recording_barcodes=False, compare_to_ref_barcode=False, barcodes_path="inputs/persistent_barcodes.pckl",
                  echo=True, **kwargs):
@@ -103,7 +108,10 @@ class Logger:
                     print("ERROR, unknown MTG")
             # Elif a dict of properties have already been provided
             elif str(type(data_structure)) == "<class 'dict'>":
-                self.props[name] = data_structure
+                if name == "soil":
+                    self.props[name] = data_structure
+                else:
+                    print("[WARNING] Unknown data structure has been passed to logger")
             else:
                 print("[WARNING] Unknown data structure has been passed to logger")
 
@@ -132,6 +140,7 @@ class Logger:
         self.imposed_clim=imposed_clim
         self.recording_off_screen = recording_off_screen
         self.final_snapshots = final_snapshots
+        self.export_3D_scene = export_3D_scene
         self.show_soil = show_soil
         self.plotted_property = plotted_property
         self.flow_property = flow_property
@@ -217,11 +226,11 @@ class Logger:
         
         if isinstance(self.imposed_clim, bool):
             if self.imposed_clim:
-                clim = [self.fields[self.plotted_property]["min_value"], self.fields[self.plotted_property]["max_value"]]
+                self.clim = [self.fields[self.plotted_property]["min_value"], self.fields[self.plotted_property]["max_value"]]
             else:
-                clim = [self.all_times_low, self.all_times_high]
+                self.clim = [self.all_times_low, self.all_times_high]
         else:
-            clim = self.imposed_clim
+            self.clim = self.imposed_clim
 
         sizes = {"landscape": [1920, 1080], "portrait": [1088, 1920], "square": [1080, 1080],
                     "small_height": [960, 1280]}
@@ -243,7 +252,7 @@ class Logger:
 
         # Then add initial states of plotted compartments
         root_system_mesh, color_property, root_hair_mesh = plot_mtg_alt(self.data_structures["root"], cmap_property=self.plotted_property, root_hairs=False)
-        self.current_mesh = self.plotter.add_mesh(root_system_mesh, cmap="jet", clim=clim, show_edges=False, log_scale=False)
+        self.current_mesh = self.plotter.add_mesh(root_system_mesh, cmap="jet", clim=self.clim, show_edges=False, log_scale=False)
         if root_hair_mesh:
             self.root_hair_current_mesh = self.plotter.add_mesh(root_hair_mesh, cmap="jet", opacity=0.05)
         self.plot_text = self.plotter.add_text(f"Simulation starting...", position="upper_left")
@@ -294,8 +303,9 @@ class Logger:
 
         if self.simulation_time_in_hours > 0:
             self.log = f"\r[RUNNING] {self.simulation_time_in_hours} hours | step took {round(self.current_step_start_time - self.previous_step_start_time, 1)} s"
-            # if self.echo:
-            #     sys.stdout.write(self.log)
+            if self.echo:
+                sys.stdout.write(self.log)
+                # print(self.log, end="\r")
             logging.info(self.log + f"| {time.strftime('%H:%M:%S', time.gmtime(int(self.elapsed_time)))} since simulation started")
 
         if self.recording_sums:
@@ -321,8 +331,12 @@ class Logger:
 
     def run_and_monitor_model_step(self):
         if self.recording_performance:
-            # Also runs the time step!!
-            self.recording_step_performance()
+            t_start = time.time()
+            self.__call__()
+            log_time = time.time() - t_start
+            step_elapsed = self.time_and_run()
+            step_elapsed["log_time"] = log_time
+            self.simulation_performance = pd.concat([self.simulation_performance, step_elapsed])
         else:
             self.model_instance.run()
 
@@ -352,10 +366,7 @@ class Logger:
             index=[simulation_time_in_hours])
 
         return step_elapsed
-
-    def recording_step_performance(self):
-        step_elapsed = self.time_and_run()
-        self.simulation_performance = pd.concat([self.simulation_performance, step_elapsed])
+        
 
     def recording_summed_MTG_properties_to_csv(self):
         # We init the dict that will capture all recorded properties of the current time-step
@@ -420,6 +431,14 @@ class Logger:
         # convert dict to dataframe with index corresponding to coordinates in topology space
         # (not just x, y, z, t thanks to MTG structure)
         props_dict = {k: v for k, v in self.props["root"].items() if type(v) == dict and k in variables}
+        raw_soil = True
+        soil_target_variables = ["soil_temperature"]
+        if raw_soil:
+            soil_shape = self.props["soil"]["soil_temperature"].shape
+            voxel_number = soil_shape[0] * soil_shape[1] * soil_shape[2]
+            voxel_ids = [-(i+1) for i in range(voxel_number)]
+            props_dict.update({k: dict(zip(voxel_ids, v.reshape(-1))) for k, v in self.props["soil"].items() if k in soil_target_variables})
+
         props_df = pd.DataFrame.from_dict(props_dict)
         props_df["vid"] = props_df.index
         props_df["t"] = [time for k in range(props_df.shape[0])]
@@ -450,10 +469,14 @@ class Logger:
         return props_ds
 
     def recording_mtg_files(self):
-        with open(os.path.join(self.MTG_files_dirpath, f'root_{self.simulation_time_in_hours}.pckl'), "wb") as f:
-            pickle.dump(self.data_structures["root"], f)
+        with open(os.path.join(self.MTG_files_dirpath, f'data_{self.simulation_time_in_hours}.pckl'), "wb") as f:
+            pickle.dump(self.data_structures, f)
 
     def recording_images_with_pyvista(self):
+
+        # This is required since the dictionnary is not emptied when using plotter.remove_actor. However this is not a problem to the use of the remove_actor in the renderer for next time_step.
+        self.plotter.renderer.actors.clear()
+
         if "root" in self.data_structures.keys():
             # TODO : step back according to max(||x2-x1||, ||y2-y1||, ||z2-z1||)
             root_system_mesh, color_property, root_hair_mesh = plot_mtg_alt(self.data_structures["root"], cmap_property=self.plotted_property, flow_property=self.flow_property, root_hairs=False)
@@ -481,17 +504,17 @@ class Logger:
 
             if isinstance(self.imposed_clim, bool):
                 if self.imposed_clim and isinstance(self.fields[self.plotted_property]["min_value"], float):
-                    clim = [self.fields[self.plotted_property]["min_value"],
+                    self.clim = [self.fields[self.plotted_property]["min_value"],
                             self.fields[self.plotted_property]["max_value"]]
                 else:
-                    clim = [self.all_times_low, self.all_times_high]
+                    self.clim = [self.all_times_low, self.all_times_high]
             else:
-                clim = self.imposed_clim
+                self.clim = self.imposed_clim
 
             log_scale = True
 
             self.current_mesh = self.plotter.add_mesh(root_system_mesh, cmap="jet",
-                                                      clim=clim, show_edges=False,
+                                                      clim=self.clim, show_edges=False,
                                                       specular=1., log_scale=log_scale)
             if root_hair_mesh:
                 self.plotter.remove_actor(self.root_hair_current_mesh)
@@ -522,13 +545,7 @@ class Logger:
         self.plotter.update()
         self.plotter.write_frame()
 
-        export_3D = False
-        if export_3D:
-            export_scene_to_gltf(output_path=os.path.join(self.root_images_dirpath, f"{self.simulation_time_in_hours}.gltf"),
-                                 plotter=self.plotter, clim=clim)
-
-        # This is required since the dictionnary is not emptied when using plotter.remove_actor. However this is not a problem to the use of the remove_actor in the renderer for next time_step.
-        self.plotter.renderer.actors.clear()
+        
 
     def write_to_disk(self, xarray_list):
         interstitial_dataset = xr.concat(xarray_list, dim="t")
@@ -682,12 +699,7 @@ class Logger:
             self.plant_scale_properties.to_csv(
                 os.path.join(self.MTG_properties_summed_dirpath, "plant_scale_properties.csv"))
 
-        if not self.recording_images and self.final_snapshots:
-            print("[INFO] Saving a final snapshot...")
-            if not self.static_mtg:
-                self.log_mtg_coordinates()
-            self.init_images_plotter()
-            self.recording_images_with_pyvista()
+        
 
         final_interactive_picking = True
         if self.recording_images and final_interactive_picking and not self.recording_off_screen:
@@ -700,9 +712,28 @@ class Logger:
                 self.plotter.reset_camera()
                 self.plotter.show(interactive_update=False)
 
-        if not self.recording_mtg and self.final_snapshots:
-            print("[INFO] Saving the final state of the MTG...")
-            self.recording_mtg_files()
+        if self.final_snapshots:
+
+            if not self.recording_mtg:
+                print("[INFO] Saving the final state of the MTG...")
+                self.recording_mtg_files()
+            
+            if not self.recording_images:
+                print("[INFO] Saving a final snapshot...")
+                if not self.static_mtg:
+                    self.log_mtg_coordinates()
+                self.init_images_plotter()
+                self.recording_images_with_pyvista()
+                if self.export_3D_scene:
+                    export_scene_to_gltf(output_path=os.path.join(self.root_images_dirpath, f"{self.simulation_time_in_hours}.gltf"),
+                                        plotter=self.plotter, clim=self.clim)
+
+            else:
+                if self.export_3D_scene:
+                    print("[INFO] Saving a final snapshot...")
+                    export_scene_to_gltf(output_path=os.path.join(self.root_images_dirpath, f"{self.simulation_time_in_hours}.gltf"),
+                                        plotter=self.plotter, clim=self.clim)
+                    
 
         if self.recording_raw:
             # For saved xarray datasets
