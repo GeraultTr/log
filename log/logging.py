@@ -322,9 +322,9 @@ class Logger:
             if self.recording_mtg:
                 self.recording_mtg_files()
             if self.recording_images:
+                self.recording_images_with_pyvista()
                 self.plotter.screenshot(os.path.join(self.outputs_dirpath, f"root_images/snapshot_{self.simulation_time_in_hours}.png"),
                                     transparent_background=True, scale=5)
-                self.recording_images_with_pyvista()
 
         self.simulation_time_in_hours += self.time_step_in_hours
         self.previous_step_start_time = self.current_step_start_time
@@ -355,9 +355,9 @@ class Logger:
             t_start = time.time()
             exec(step)
             steps_times[step] = time.time() - t_start
-        total_time = time.time() - loop_start
-        for step in steps:
-            steps_times[step] /= total_time
+        # total_time = time.time() - loop_start
+        # for step in steps:
+        #     steps_times[step] /= total_time
         # To visualize first which step is the most costly
         steps_times = dict(sorted(steps_times.items(), key=lambda item: item[1]))
         step_elapsed = pd.DataFrame(
@@ -724,6 +724,8 @@ class Logger:
                     self.log_mtg_coordinates()
                 self.init_images_plotter()
                 self.recording_images_with_pyvista()
+                self.plotter.screenshot(os.path.join(self.outputs_dirpath, f"root_images/snapshot_{self.simulation_time_in_hours}.png"),
+                                    transparent_background=True, scale=5)
                 if self.export_3D_scene:
                     export_scene_to_gltf(output_path=os.path.join(self.root_images_dirpath, f"{self.simulation_time_in_hours}.gltf"),
                                         plotter=self.plotter, clim=self.clim)
