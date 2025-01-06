@@ -38,13 +38,14 @@ class Logger:
                     animate_raw_logs=True,
                     on_shoot_logs=False)
     
-    medium_log_focus_images = dict(recording_images=True, recording_off_screen=False, plotted_property="C_hexose_root", flow_property=False, show_soil=True,
+    medium_log_focus_images = dict(recording_images=True, recording_off_screen=True, auto_camera_position=False, static_mtg=False,
+                    plotted_property="hexose_exudation", flow_property=True, show_soil=False, imposed_clim=usual_clims["hexose_exudation"],
                     recording_mtg=False,
                     recording_raw=False,
+                    final_snapshots=True,
+                    export_3D_scene=True,
                     recording_sums=True,
-                    final_snapshots=False,
                     recording_performance=True,
-                    recording_shoot=True,
                     recording_barcodes=False, compare_to_ref_barcode=False,
                     on_sums=True,
                     on_performance=True,
@@ -217,7 +218,7 @@ class Logger:
         self.simulation_time_in_hours = 0
 
 
-    def init_images_plotter(self, background_color="white"):
+    def init_images_plotter(self, background_color="brown"):
         self.prop_mins = [None for k in range(9)] + [min(self.props["root"][self.plotted_property].values())]
         self.prop_maxs = [None for k in range(9)] + [max(self.props["root"][self.plotted_property].values())]
         self.all_times_low, self.all_times_high = self.prop_mins[-1], self.prop_mins[-1]
@@ -242,7 +243,7 @@ class Logger:
         self.plotter.set_background(background_color)
 
         framerate = 10
-        self.plotter.open_movie(os.path.join(self.root_images_dirpath, "root_movie.mp4"), framerate)
+        self.plotter.open_movie(os.path.join(self.root_images_dirpath, "root_movie.mp4"), framerate=framerate, quality=10)
         self.plotter.show(interactive_update=True)
 
         # NOTE : Not necessary since voxels provide the scale information :
@@ -271,8 +272,8 @@ class Logger:
         if self.auto_camera_position:
             self.plotter.reset_camera()
         else:
-            step_back_coefficient = 0.9
-            move_up_coefficient = 0.12
+            step_back_coefficient = 1.3 #0.9
+            move_up_coefficient = 0.12 * 1.5
             tilt_down_coefficient = 0.2 * 0
             camera_coordinates = (step_back_coefficient, 0., tilt_down_coefficient)
             horizontal_aiming = (0., 0., 1)
@@ -323,8 +324,6 @@ class Logger:
                 self.recording_mtg_files()
             if self.recording_images:
                 self.recording_images_with_pyvista()
-                self.plotter.screenshot(os.path.join(self.outputs_dirpath, f"root_images/snapshot_{self.simulation_time_in_hours}.png"),
-                                    transparent_background=True, scale=5)
 
         self.simulation_time_in_hours += self.time_step_in_hours
         self.previous_step_start_time = self.current_step_start_time
@@ -350,8 +349,8 @@ class Logger:
         steps_times = {k: 0. for k in steps}
         loop_start = time.time()
         for step in steps:
-            if echo:
-                sys.stdout.write(log + f" | current : {step}" + " "*80)
+            # if echo:
+            #     sys.stdout.write(log + f" | current : {step}" + " "*80)
             t_start = time.time()
             exec(step)
             steps_times[step] = time.time() - t_start
@@ -543,6 +542,8 @@ class Logger:
             self.plotter.reset_camera()
 
         self.plotter.update()
+        self.plotter.screenshot(os.path.join(self.outputs_dirpath, f"root_images/snapshot_{self.simulation_time_in_hours}.png"),
+                                 transparent_background=True, scale=5)
         self.plotter.write_frame()
 
         
