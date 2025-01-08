@@ -1,5 +1,7 @@
 
 import numpy as np
+import os
+import threading
 
 from openalea.mtg.plantframe import color
 from openalea.mtg import turtle as turt
@@ -679,3 +681,61 @@ def export_scene_to_gltf(output_path, plotter, clim, colormap="jet"):
         
     # Now export the scene with converted PolyData meshes to GLTF
     export_plotter.export_gltf(output_path)
+    
+    # To ensure we don't wait for compression
+    t = threading.Thread(compress_gltf, *(output_path,))
+    t.start()
+
+
+def compress_gltf(output_path):
+    """
+    This function uses command line execution and requires Node.js installed and gltf-transform with : 
+    npm install --global @gltf-transform/cli
+    """
+
+    # Get directory path
+    directory = os.path.dirname(output_path)
+
+    # Get filename
+    filename = os.path.basename(output_path)
+    compressed_filename = filename.split(".")[0] + ".glb"
+    compressed_filepath = os.path.join(directory, compressed_filename)
+
+    tp_file = os.path.join(directory, "tp.glb")
+
+    steps = f"""gltf-transform dedup {output_path} {tp_file}
+                gltf-transform instance {tp_file} {tp_file}
+                gltf-transform palette {tp_file} {tp_file}
+                gltf-transform flatten {tp_file} {tp_file}
+                gltf-transform join {tp_file} {tp_file}
+                gltf-transform weld {tp_file} {tp_file}
+                gltf-transform simplify {tp_file} {tp_file}
+                gltf-transform resample {tp_file} {tp_file}
+                gltf-transform prune {tp_file} {tp_file}
+                gltf-transform sparse {tp_file} {tp_file}
+                gltf-transform webp {tp_file} {tp_file}
+                gltf-transform draco {tp_file} {compressed_filepath} --method edgebreaker"""
+    
+    # Split the steps into individual commands
+    commands = steps.strip().split("\n")
+
+    # Execute each command sequentially
+    try:
+        for command in commands:
+            os.system(command)
+
+        if os.path.exists(compressed_filepath):
+            os.remove(tp_file)
+            os.remove(output_path)
+        else:
+            raise FileNotFoundError
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+    
+def post_compress_gltf(image_directory):
+    to_compress = [f for f in os.listdir(image_directory) if f.endswith(".gltf")]
+    for filename in to_compress:
+        output_path = os.path.join(image_directory, filename)
+        compress_gltf(output_path)

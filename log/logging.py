@@ -541,9 +541,15 @@ class Logger:
         if self.auto_camera_position:
             self.plotter.reset_camera()
 
+        scene_screenshots = True
+        
         self.plotter.update()
-        self.plotter.screenshot(os.path.join(self.outputs_dirpath, f"root_images/snapshot_{self.simulation_time_in_hours}.png"),
-                                 transparent_background=True, scale=5)
+        if not scene_screenshots:
+            self.plotter.screenshot(os.path.join(self.outputs_dirpath, f"root_images/snapshot_{self.simulation_time_in_hours}.png"),
+                                    transparent_background=True, scale=5)
+        else:
+            export_scene_to_gltf(output_path=os.path.join(self.root_images_dirpath, f"{self.simulation_time_in_hours}.gltf"),
+                                        plotter=self.plotter, clim=self.clim)
         self.plotter.write_frame()
 
         
