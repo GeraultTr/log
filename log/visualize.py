@@ -11,8 +11,11 @@ import pyvista as pv
 
 from math import cos, sin, floor
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+from matplotlib.ticker import LogFormatterSciNotation
 from matplotlib.backend_bases import MouseButton
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+
 import tkinter as tk
 import numpy as np
 from time import sleep
@@ -113,19 +116,54 @@ def my_colormap(g, property_name, cmap='jet', vmin=None, vmax=None, lognorm=True
 
     return g
 
-def custom_colorbar(min=0, max=1, unit='Some Units'):
-    fig, ax = plt.subplots()
-    fig.subplots_adjust(bottom=0.5)
 
-    cmap = plt.cm.get_cmap('jet')
-    norm = mpl.colors.Normalize(vmin=min, vmax=max)
+def custom_colorbar(
+        folderpath=".",
+        vmin = 1e-13,
+        vmax = 1e-9,
+        colormap = "jet",
+        log_scale=True,
+        vertical=True,
+        unit="mol.s-1.g-1",
+        filename = "colormap.png"):
+    
+    # Set up normalization and colormap
+    if log_scale:
+        norm = mcolors.LogNorm(vmin=vmin, vmax=vmax)
+        formatter = LogFormatterSciNotation(base=10, labelOnlyBase=False)
+    else:
+        norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+        formatter = None
 
-    cb1 = mpl.colorbar.ColorbarBase(ax, cmap=cmap,
-                                    norm=norm,
-                                    orientation='horizontal')
-    cb1.set_label(unit)
-    plt.ion()
-    fig.show()
+    cmap = plt.get_cmap(colormap)
+    fig, ax = plt.subplots(figsize=(1, 5))  # Adjust size (width=1 inch, height=5 inches)
+    fig.subplots_adjust(left=0.5, right=0.6, top=0.95, bottom=0.05)
+
+    # Create the colorbar
+    if vertical:
+        cb = plt.colorbar(
+            plt.cm.ScalarMappable(norm=norm, cmap=cmap),
+            cax=ax,
+            orientation='vertical',
+            format=formatter
+        )
+    else:
+        cb = plt.colorbar(
+        plt.cm.ScalarMappable(norm=norm, cmap=cmap),
+        cax=ax,
+        orientation='horizontal',
+        format=formatter
+        )
+
+    cb.set_label(unit, fontsize=8)  # Smaller label size
+    cb.ax.tick_params(labelsize=6)  # Smaller tick labels
+    
+    # Save the figure with a transparent background
+    fig.savefig(os.path.join(folderpath, filename), dpi=300, transparent=True, bbox_inches='tight')
+    plt.close(fig)
+    return filename
+
+
 
 def prepareScene(scene, width=1200, height=1200, scale=0.8, x_center=0., y_center=0., z_center=0.,
                  x_cam=0., y_cam=0., z_cam=-1.5, grid=False):

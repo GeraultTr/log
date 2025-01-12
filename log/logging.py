@@ -15,7 +15,7 @@ from gudhi import bottleneck_distance
 
 from openalea.mtg.traversal import pre_order2, post_order
 from openalea.mtg import turtle as turt
-from log.visualize import plot_mtg, plot_mtg_alt, soil_voxels_mesh, shoot_plantgl_to_mesh, VertexPicker, export_scene_to_gltf
+from log.visualize import plot_mtg, plot_mtg_alt, soil_voxels_mesh, shoot_plantgl_to_mesh, VertexPicker, export_scene_to_gltf, custom_colorbar
 
 usual_clims = dict(
     Nm=[1e-3, 1.],
@@ -232,6 +232,8 @@ class Logger:
                 self.clim = [self.all_times_low, self.all_times_high]
         else:
             self.clim = self.imposed_clim
+
+        custom_colorbar(filepath=self.root_images_dirpath, vmin=self.clim[0], vmax=self.clim[1], colormap="jet", vertical=False, log_scale=True)
 
         sizes = {"landscape": [1920, 1080], "portrait": [1088, 1920], "square": [1080, 1080],
                     "small_height": [960, 1280]}
