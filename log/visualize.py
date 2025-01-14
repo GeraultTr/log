@@ -124,6 +124,7 @@ def custom_colorbar(
         colormap = "jet",
         log_scale=True,
         vertical=True,
+        label="",
         unit="mol.s-1.g-1",
         filename = "colormap.png"):
     
@@ -136,8 +137,15 @@ def custom_colorbar(
         formatter = None
 
     cmap = plt.get_cmap(colormap)
-    fig, ax = plt.subplots(figsize=(1, 5))  # Adjust size (width=1 inch, height=5 inches)
-    fig.subplots_adjust(left=0.5, right=0.6, top=0.95, bottom=0.05)
+    if vertical:
+        fig, ax = plt.subplots(figsize=(1, 5))  # Adjust size (width=1 inch, height=5 inches)
+        fig.subplots_adjust(left=0.5, right=0.6, top=0.95, bottom=0.05)
+
+    else:
+        fig, ax = plt.subplots(figsize=(5, 1))  # Adjust size (width=1 inch, height=5 inches)
+        fig.subplots_adjust(left=0.05, right=0.5, top=0.6, bottom=0.5)
+    
+    
 
     # Create the colorbar
     if vertical:
@@ -155,7 +163,7 @@ def custom_colorbar(
         format=formatter
         )
 
-    cb.set_label(unit, fontsize=8)  # Smaller label size
+    cb.set_label(f"{label} ({unit})", fontsize=8)  # Smaller label size
     cb.ax.tick_params(labelsize=6)  # Smaller tick labels
     
     # Save the figure with a transparent background
@@ -721,7 +729,7 @@ def export_scene_to_gltf(output_path, plotter, clim, colormap="jet"):
     export_plotter.export_gltf(output_path)
     
     # To ensure we don't wait for compression
-    t = threading.Thread(compress_gltf, *(output_path,))
+    t = threading.Thread(target=compress_gltf, args=(output_path,))
     t.start()
 
 

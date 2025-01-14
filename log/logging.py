@@ -233,7 +233,7 @@ class Logger:
         else:
             self.clim = self.imposed_clim
 
-        custom_colorbar(filepath=self.root_images_dirpath, vmin=self.clim[0], vmax=self.clim[1], colormap="jet", vertical=False, log_scale=True)
+        custom_colorbar(folderpath=self.root_images_dirpath, label=self.plotted_property, vmin=self.clim[0], vmax=self.clim[1], colormap="jet", vertical=False, log_scale=True)
 
         sizes = {"landscape": [1920, 1080], "portrait": [1088, 1920], "square": [1080, 1080],
                     "small_height": [960, 1280]}
