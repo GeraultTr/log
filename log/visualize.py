@@ -729,7 +729,7 @@ def export_scene_to_gltf(output_path, plotter, clim, colormap="jet"):
     export_plotter.export_gltf(output_path)
     
     # To ensure we don't wait for compression
-    t = threading.Thread(target=compress_gltf, args=(output_path,))
+    t = threading.Thread(target=silent_gltf_compression, args=(output_path,))
     t.start()
 
 
@@ -778,6 +778,18 @@ def compress_gltf(output_path):
 
     except Exception as e:
         print(f"An error occurred: {e}")
+
+def silent_gltf_compression(output_path):
+    with open(os.devnull, 'w') as f:
+        old_stdout, old_stderr = os.dup(1), os.dup(2)  # Save original stdout/stderr
+        os.dup2(f.fileno(), 1)  # Redirect stdout
+        os.dup2(f.fileno(), 2)  # Redirect stderr
+
+        try:
+            compress_gltf(output_path)
+        finally:
+            os.dup2(old_stdout, 1)  # Restore stdout
+            os.dup2(old_stderr, 2)  # Restore stderr
 
     
 def post_compress_gltf(image_directory):

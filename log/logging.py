@@ -18,18 +18,20 @@ from openalea.mtg import turtle as turt
 from log.visualize import plot_mtg, plot_mtg_alt, soil_voxels_mesh, shoot_plantgl_to_mesh, VertexPicker, export_scene_to_gltf, custom_colorbar
 
 usual_clims = dict(
-    Nm=[1e-3, 1.],
-    hexose_exudation=[1e-13, 1e-9]
+    Nm=[1e-4, 1.],
+    hexose_exudation=[1e-13, 1e-9],
+    import_Nm=[1e-12, 1e-7],
+    radial_import_water=[1e-22, 1e-16]
 )
 
 class Logger:
 
-    light_log = dict(recording_images=False, recording_off_screen=True, auto_camera_position=False, static_mtg=False,
-                    plotted_property="hexose_exudation", flow_property=True, show_soil=False, imposed_clim=usual_clims["hexose_exudation"],
+    light_log = dict(recording_images=False, recording_off_screen=True, auto_camera_position=False,
+                    plotted_property="radial_import_water", flow_property=True, show_soil=False, imposed_clim=usual_clims["radial_import_water"],
                     recording_mtg=False,
                     recording_raw=False,
-                    final_snapshots=True,
-                    export_3D_scene=True,
+                    final_snapshots=False,
+                    export_3D_scene=False,
                     recording_sums=True,
                     recording_performance=True,
                     recording_barcodes=False, compare_to_ref_barcode=False,
@@ -38,8 +40,8 @@ class Logger:
                     animate_raw_logs=True,
                     on_shoot_logs=False)
     
-    medium_log_focus_images = dict(recording_images=True, recording_off_screen=True, auto_camera_position=False, static_mtg=False,
-                    plotted_property="hexose_exudation", flow_property=True, show_soil=False, imposed_clim=usual_clims["hexose_exudation"],
+    medium_log_focus_images = dict(recording_images=True, recording_off_screen=True, auto_camera_position=False,
+                    plotted_property="import_Nm", flow_property=True, show_soil=False, imposed_clim=usual_clims["import_Nm"],
                     recording_mtg=False,
                     recording_raw=False,
                     final_snapshots=True,
@@ -52,12 +54,12 @@ class Logger:
                     animate_raw_logs=False,
                     on_shoot_logs=True)
     
-    medium_log_focus_properties = dict(recording_images=False, recording_off_screen=True, auto_camera_position=False, static_mtg=False,
-                    plotted_property="hexose_exudation", flow_property=True, show_soil=False, imposed_clim=usual_clims["hexose_exudation"],
+    medium_log_focus_properties = dict(recording_images=False, recording_off_screen=True, auto_camera_position=False,
+                    plotted_property="import_Nm", flow_property=True, show_soil=False, imposed_clim=usual_clims["import_Nm"],
                     recording_mtg=False,
                     recording_raw=True,
-                    final_snapshots=True,
-                    export_3D_scene=True,
+                    final_snapshots=False,
+                    export_3D_scene=False,
                     recording_sums=True,
                     recording_performance=True,
                     recording_barcodes=False, compare_to_ref_barcode=False,
@@ -66,8 +68,8 @@ class Logger:
                     animate_raw_logs=True,
                     on_shoot_logs=False)
     
-    heavy_log = dict(recording_images=True, recording_off_screen=True, auto_camera_position=False, static_mtg=False,
-                     plotted_property="hexose_exudation", flow_property=True, show_soil=False, imposed_clim=usual_clims["hexose_exudation"],
+    heavy_log = dict(recording_images=True, recording_off_screen=True, auto_camera_position=False,
+                     plotted_property="import_Nm", flow_property=True, show_soil=False, imposed_clim=usual_clims["import_Nm"],
                     recording_mtg=False,
                     recording_raw=True,
                     final_snapshots=True,
@@ -181,13 +183,13 @@ class Logger:
 
         if self.output_variables == {}:
             for model in self.components:
-                self.summable_output_variables += model.extensive_variables
-                self.meanable_output_variables += model.intensive_variables
+                self.summable_output_variables += model.extensive_variables + model.non_inertial_extensive
+                self.meanable_output_variables += model.intensive_variables + model.non_inertial_intensive + model.massic_concentration
                 self.plant_scale_state += model.plant_scale_state
                 available_inputs = [i for i in model.inputs if
                                     i in self.props.keys()]  # To prevent getting inputs that are not provided neither from another model nor mtg
                 self.output_variables.update(
-                    {f.name: f.metadata for f in fields(model) if f.name in model.state_variables + model.plant_scale_state + available_inputs + ["struct_mass"]})
+                    {f.name: f.metadata for f in fields(model) if f.name in self.summable_output_variables + self.meanable_output_variables + self.plant_scale_state})
                 self.units_for_outputs.update({f.name: f.metadata["unit"] for f in fields(model) if
                                                f.name in self.summable_output_variables + self.meanable_output_variables + self.plant_scale_state})
 
@@ -729,15 +731,18 @@ class Logger:
             
             if not self.recording_images:
                 print("[INFO] Saving a final snapshot...")
-                if not self.static_mtg:
-                    self.log_mtg_coordinates()
-                self.init_images_plotter()
-                self.recording_images_with_pyvista()
-                self.plotter.screenshot(os.path.join(self.outputs_dirpath, f"root_images/snapshot_{self.simulation_time_in_hours}.png"),
-                                    transparent_background=True, scale=5)
-                if self.export_3D_scene:
-                    export_scene_to_gltf(output_path=os.path.join(self.root_images_dirpath, f"{self.simulation_time_in_hours}.gltf"),
-                                        plotter=self.plotter, clim=self.clim)
+                try:
+                    if not self.static_mtg:
+                        self.log_mtg_coordinates()
+                    self.init_images_plotter()
+                    self.recording_images_with_pyvista()
+                    self.plotter.screenshot(os.path.join(self.outputs_dirpath, f"root_images/snapshot_{self.simulation_time_in_hours}.png"),
+                                        transparent_background=True, scale=5)
+                    if self.export_3D_scene:
+                        export_scene_to_gltf(output_path=os.path.join(self.root_images_dirpath, f"{self.simulation_time_in_hours}.gltf"),
+                                            plotter=self.plotter, clim=self.clim)
+                except:
+                    print("Failed to save scene snapshot")
 
             else:
                 if self.export_3D_scene:
