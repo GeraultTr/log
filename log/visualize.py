@@ -679,7 +679,7 @@ class VertexPicker:
         return ((x1-x2)**2 + (y1-y2)**2 + (z1-z2)**2)**0.5
     
 
-def export_scene_to_gltf(output_path, plotter, clim, colormap="jet"):
+def export_scene_to_gltf(output_path, plotter, clim, colormap="jet", parallel_compression=True):
     """
     Scene exporter to 3D GLTF to make animations
     WARNING : Doesn't support transparent soil yet as we limit to one multiblock only to avoid duplicated orthogonal bug that has been noticed in export
@@ -728,9 +728,13 @@ def export_scene_to_gltf(output_path, plotter, clim, colormap="jet"):
     # Now export the scene with converted PolyData meshes to GLTF
     export_plotter.export_gltf(output_path)
     
-    # To ensure we don't wait for compression
-    t = threading.Thread(target=silent_gltf_compression, args=(output_path,))
-    t.start()
+    if parallel_compression:
+        # To ensure we don't wait for compression
+        t = threading.Thread(target=compress_gltf, args=(output_path,))
+        t.start()
+
+    else:
+        compress_gltf(output_path)
 
 
 def compress_gltf(output_path):
@@ -747,7 +751,11 @@ def compress_gltf(output_path):
     compressed_filename = filename.split(".")[0] + ".glb"
     compressed_filepath = os.path.join(directory, compressed_filename)
 
-    tp_file = os.path.join(directory, "tp.glb")
+    tp_directory = os.path.join(directory, filename.split(".")[0])
+    if not os.path.exists(tp_directory):
+        os.mkdir(tp_directory)
+
+    tp_file = os.path.join(tp_directory, "tp.glb")
 
     steps = f"""gltf-transform dedup {output_path} {tp_file}
                 gltf-transform instance {tp_file} {tp_file}
@@ -772,6 +780,7 @@ def compress_gltf(output_path):
 
         if os.path.exists(compressed_filepath):
             os.remove(tp_file)
+            os.rmdir(tp_directory)
             os.remove(output_path)
         else:
             raise FileNotFoundError

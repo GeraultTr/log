@@ -21,16 +21,17 @@ usual_clims = dict(
     Nm=[1e-4, 1.],
     hexose_exudation=[1e-13, 1e-9],
     import_Nm=[1e-12, 1e-7],
-    radial_import_water=[1e-22, 1e-16]
+    radial_import_water=[1e-22, 1e-16],
+    C_hexose_root=[1e-4, 2e-4]
 )
 
 class Logger:
 
     light_log = dict(recording_images=False, recording_off_screen=True, auto_camera_position=False,
-                    plotted_property="radial_import_water", flow_property=True, show_soil=False, imposed_clim=usual_clims["radial_import_water"],
+                    plotted_property="import_Nm", flow_property=True, show_soil=False, imposed_clim=usual_clims["import_Nm"],
                     recording_mtg=False,
                     recording_raw=False,
-                    final_snapshots=False,
+                    final_snapshots=True,
                     export_3D_scene=False,
                     recording_sums=True,
                     recording_performance=True,
@@ -69,7 +70,7 @@ class Logger:
                     on_shoot_logs=False)
     
     heavy_log = dict(recording_images=True, recording_off_screen=True, auto_camera_position=False,
-                     plotted_property="import_Nm", flow_property=True, show_soil=False, imposed_clim=usual_clims["import_Nm"],
+                     plotted_property="C_hexose_root", flow_property=False, show_soil=False, imposed_clim=usual_clims["C_hexose_root"],
                     recording_mtg=False,
                     recording_raw=True,
                     final_snapshots=True,
@@ -174,7 +175,7 @@ class Logger:
         self.create_or_empty_directory(self.MTG_files_dirpath)
         self.create_or_empty_directory(self.MTG_properties_dirpath)
         self.create_or_empty_directory(self.MTG_properties_summed_dirpath)
-        if self.recording_raw:
+        if self.recording_raw or self.final_snapshots:
             self.create_or_empty_directory(self.MTG_properties_raw_dirpath)
         if self.recording_barcodes:
             self.create_or_empty_directory(self.MTG_barcodes_dirpath)
@@ -475,7 +476,7 @@ class Logger:
         with open(os.path.join(self.MTG_files_dirpath, f'data_{self.simulation_time_in_hours}.pckl'), "wb") as f:
             pickle.dump(self.data_structures, f)
 
-    def recording_images_with_pyvista(self):
+    def recording_images_with_pyvista(self, custom_name="", parallel_compression=True, recording_video=True):
 
         # This is required since the dictionnary is not emptied when using plotter.remove_actor. However this is not a problem to the use of the remove_actor in the renderer for next time_step.
         self.plotter.renderer.actors.clear()
@@ -552,16 +553,22 @@ class Logger:
             self.plotter.screenshot(os.path.join(self.outputs_dirpath, f"root_images/snapshot_{self.simulation_time_in_hours}.png"),
                                     transparent_background=True, scale=5)
         else:
-            export_scene_to_gltf(output_path=os.path.join(self.root_images_dirpath, f"{self.simulation_time_in_hours}.gltf"),
-                                        plotter=self.plotter, clim=self.clim)
-        self.plotter.write_frame()
+            export_scene_to_gltf(output_path=os.path.join(self.root_images_dirpath, f"{custom_name}{self.simulation_time_in_hours}.gltf"),
+                                        plotter=self.plotter, clim=self.clim, parallel_compression=parallel_compression)
+        
+        if recording_video:
+            self.plotter.write_frame()
 
         
 
-    def write_to_disk(self, xarray_list):
+    def write_to_disk(self, xarray_list, custom_name=None):
         interstitial_dataset = xr.concat(xarray_list, dim="t")
-        interstitial_dataset.to_netcdf(
-            os.path.join(self.MTG_properties_raw_dirpath, f't={self.simulation_time_in_hours}.nc'))
+        if custom_name:
+            interstitial_dataset.to_netcdf(
+                os.path.join(self.MTG_properties_raw_dirpath, custom_name))
+        else:
+            interstitial_dataset.to_netcdf(
+                os.path.join(self.MTG_properties_raw_dirpath, f't={self.simulation_time_in_hours}.nc'))
 
     def barcode_from_mtg(self):
         props = self.props["root"]
@@ -728,21 +735,28 @@ class Logger:
             if not self.recording_mtg:
                 print("[INFO] Saving the final state of the MTG...")
                 self.recording_mtg_files()
+
+            if not self.recording_raw:
+                print("[INFO] Saving a final state xarray...")
+                self.write_to_disk([self.mtg_to_dataset(variables=self.output_variables, time=self.simulation_time_in_hours)], custom_name="merged.nc")
             
             if not self.recording_images:
                 print("[INFO] Saving a final snapshot...")
-                try:
-                    if not self.static_mtg:
-                        self.log_mtg_coordinates()
-                    self.init_images_plotter()
-                    self.recording_images_with_pyvista()
-                    self.plotter.screenshot(os.path.join(self.outputs_dirpath, f"root_images/snapshot_{self.simulation_time_in_hours}.png"),
+                # try:
+                if not self.static_mtg:
+                    self.log_mtg_coordinates()
+                self.init_images_plotter()
+                for prop, clim in usual_clims.items():
+                    self.plotted_property = prop
+                    self.imposed_clim = clim
+                    self.recording_images_with_pyvista(custom_name=f"{self.plotted_property}_", 
+                                                       parallel_compression=False, recording_video=False)
+                    custom_colorbar(folderpath=self.root_images_dirpath, label=prop, vmin=clim[0], vmax=clim[1], 
+                                    colormap="jet", vertical=False, log_scale=True, filename=f"{prop}_colorbar.png")
+                    self.plotter.screenshot(os.path.join(self.outputs_dirpath, f"root_images/{self.plotted_property}_{self.simulation_time_in_hours}.png"),
                                         transparent_background=True, scale=5)
-                    if self.export_3D_scene:
-                        export_scene_to_gltf(output_path=os.path.join(self.root_images_dirpath, f"{self.simulation_time_in_hours}.gltf"),
-                                            plotter=self.plotter, clim=self.clim)
-                except:
-                    print("Failed to save scene snapshot")
+                # except:
+                #     print("Failed to save scene snapshot")
 
             else:
                 if self.export_3D_scene:
