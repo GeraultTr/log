@@ -544,7 +544,7 @@ def plot_xr(datasets, vertice=[], summing=0, selection=[], supplementary_legend=
     root.update()
 
 
-def lines_from_points(points):
+def lines_from_points_old(points):
     """Given an array of points, make a line set"""
     poly = pv.PolyData()
     poly.points = points
@@ -554,9 +554,28 @@ def lines_from_points(points):
     poly.lines = cells
     return poly
 
+def lines_from_segments(x1, y1, z1, x2, y2, z2):
+    """Create a PolyData object where each segment is independent."""
+    poly = pv.PolyData()
 
-def plot_mtg_alt(g, cmap_property, flow_property=True, root_hairs=False):
+    # Stack start and end points into a single array
+    points = np.vstack([np.column_stack([x1, y1, z1]), np.column_stack([x2, y2, z2])])
+    poly.points = points
+
+    # Create independent line segments
+    num_segments = len(x1)
+    cells = np.empty((num_segments, 3), dtype=np.int_)
+    cells[:, 0] = 2  # Each segment has exactly 2 points
+    cells[:, 1] = np.arange(num_segments)  # Start index
+    cells[:, 2] = np.arange(num_segments, 2 * num_segments)  # End index
+
+    poly.lines = cells
+    return poly
+
+
+def plot_mtg_alt_old(g, cmap_property, flow_property=True, root_hairs=False):
     props = g.properties()
+    vertices = list(props["struct_mass"].keys())
     root_gen = g.component_roots_at_scale_iter(g.root, scale=1)
     root = next(root_gen)
 
@@ -564,6 +583,12 @@ def plot_mtg_alt(g, cmap_property, flow_property=True, root_hairs=False):
     tubes = []
     root_hairs_tubes = []
     root_hairs_opacity = []
+
+    if flow_property:
+        plot_property_name = cmap_property + ".m-1"
+    else:
+        plot_property_name = cmap_property
+
     for vid in pre_order2(g, root):
         if vid not in plotted_vids:
             root = g.Axis(vid)
@@ -577,34 +602,86 @@ def plot_mtg_alt(g, cmap_property, flow_property=True, root_hairs=False):
                 if grandparent:
                     root = [grandparent] + root
             
-            points = np.array([[props["x2"][v], props["y2"][v], props["z2"][v]] for v in root])
-            line = lines_from_points(points)
+            # points = np.array([[props["x2"][v], props["y2"][v], props["z2"][v]] for v in root])
+            # line = lines_from_points(points)
+            line = lines_from_segments(x1=list(props["x1"].values()),
+                                       y1=list(props["y1"].values()),
+                                       z1=list(props["z1"].values()),
+                                       x2=list(props["x2"].values()),
+                                       y2=list(props["y2"].values()),
+                                       z2=list(props["z2"].values()))
+            print(line.n_points, line.n_cells)
 
-            if root_hairs:
-                root_hairs_line = line
-                #root_hairs_line["living_root_hairs_struct_mass"] = [props["living_root_hairs_struct_mass"][v] for v in root]
-                root_hairs_line["radius"] = [props["radius"][v] + props["root_hair_length"][v] for v in root]
-                root_hairs_tubes += [root_hairs_line.tube(scalars="radius", absolute=True)]
+            # if root_hairs:
+            #     root_hairs_line = line
+            #     #root_hairs_line["living_root_hairs_struct_mass"] = [props["living_root_hairs_struct_mass"][v] for v in root]
+            #     root_hairs_line["radius"] = [props["radius"][v] + props["root_hair_length"][v] for v in root]
+            #     root_hairs_tubes += [root_hairs_line.tube(scalars="radius", absolute=True)]
             
             if flow_property:
-                color_property = []
-                for v in root:
-                    if props["length"][v] > 0:
-                        color_property += [props[cmap_property][v] / props["length"][v]]
-                    else:
-                        color_property += [0]
-                line[cmap_property + ".m-1"] = color_property
+                # color_property = []
+                color_property = [props[cmap_property][v] / props["length"][v] if props["length"][v] > 0 else 0 for v in vertices]
+                # for v in root:
+                #     if props["length"][v] > 0:
+                #         color_property += [props[cmap_property][v] / props["length"][v]]
+                #     else:
+                #         color_property += [0]
+                line[plot_property_name] = color_property
             else:
-                color_property = [props[cmap_property][v] for v in root]
-                line[cmap_property] = color_property
+                # color_property = [props[cmap_property][v] for v in root]
+                color_property = list(props[cmap_property].values())
+                line[plot_property_name] = color_property
+
             # Adjust radius of each element
-            line["radius"] = [props["radius"][v] for v in root]
-            tubes += [line.tube(scalars="radius", absolute=True)]
+            # line["radius"] = [props["radius"][v] for v in root]
+            line["radius"] = list(props["radius"].values())
+            tube = line.tube(scalars="radius", absolute=True)
+            print(tube.n_cells)
+            tubes.append(tube)
     
     root_system = pv.MultiBlock(tubes)
 
     if root_hairs:
         root_hairs_system = pv.MultiBlock(root_hairs_tubes)
+        return root_system, color_property, root_hairs_system
+    
+    else:
+        return root_system, color_property, None
+
+def plot_mtg_alt(g, cmap_property, flow_property=True, root_hairs=False):
+    props = g.properties()
+    vertices = [vid for vid in g.vertices(scale=g.max_scale()) if props["struct_mass"][vid] > 0]
+            
+    line = lines_from_segments(x1=[props["x1"][v] for v in vertices],
+                                y1=[props["y1"][v] for v in vertices],
+                                z1=[props["z1"][v] for v in vertices],
+                                x2=[props["x2"][v] for v in vertices],
+                                y2=[props["y2"][v] for v in vertices],
+                                z2=[props["z2"][v] for v in vertices])
+
+    if root_hairs:
+        root_hairs_line = line
+        root_hairs_line["living_root_hairs_struct_mass"] = [props["living_root_hairs_struct_mass"][v] for v in vertices] * 2
+        root_hairs_line["radius"] = [props["radius"][v] + props["root_hair_length"][v] for v in vertices] * 2
+        root_hairs_tubes = root_hairs_line.tube(scalars="radius", absolute=True)
+
+    if flow_property:
+        # color_property = []
+        color_property = [props[cmap_property][v] / props["length"][v] if props["length"][v] > 0 else 0 for v in vertices]
+        line[cmap_property + ".m-1"] = color_property * 2
+    else:
+        # color_property = [props[cmap_property][v] for v in root]
+        color_property = [props[cmap_property][v] for v in vertices]
+        line[cmap_property] = color_property * 2
+
+    # Adjust radius of each element
+    line["radius"] = [props["radius"][v] for v in vertices] * 2
+    tubes = line.tube(scalars="radius", absolute=True)
+
+    root_system = pv.MultiBlock([tubes])
+
+    if root_hairs:
+        root_hairs_system = pv.MultiBlock([root_hairs_tubes])
         return root_system, color_property, root_hairs_system
     
     else:
@@ -728,13 +805,13 @@ def export_scene_to_gltf(output_path, plotter, clim, colormap="jet", parallel_co
     # Now export the scene with converted PolyData meshes to GLTF
     export_plotter.export_gltf(output_path)
     
-    if parallel_compression:
-        # To ensure we don't wait for compression
-        t = threading.Thread(target=compress_gltf, args=(output_path,))
-        t.start()
+    # if parallel_compression:
+    #     # To ensure we don't wait for compression
+    #     t = threading.Thread(target=compress_gltf, args=(output_path,))
+    #     t.start()
 
-    else:
-        compress_gltf(output_path)
+    # else:
+    #     compress_gltf(output_path)
 
 
 def compress_gltf(output_path):

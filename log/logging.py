@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 import time
 import pickle
@@ -17,12 +18,32 @@ from openalea.mtg.traversal import pre_order2, post_order
 from openalea.mtg import turtle as turt
 from log.visualize import plot_mtg, plot_mtg_alt, soil_voxels_mesh, shoot_plantgl_to_mesh, VertexPicker, export_scene_to_gltf, custom_colorbar
 
+# usual_clims = dict(
+#     Nm=[1e-4, 1.],
+#     hexose_exudation=[1e-13, 1e-9],
+#     import_Nm=[1e-12, 1e-7],
+#     radial_import_water=[1e-22, 1e-16],
+#     C_hexose_root=[1e-4, 2e-4],
+#     root_exchange_surface=[1e-5, 1e-4]
+# )
+
+# with 24h static strategy
 usual_clims = dict(
-    Nm=[1e-4, 1.],
-    hexose_exudation=[1e-13, 1e-9],
-    import_Nm=[1e-12, 1e-7],
-    radial_import_water=[1e-22, 1e-16],
-    C_hexose_root=[1e-4, 2e-4]
+    Nm=[1e-4, 1e-3],
+    hexose_exudation=[1e-13, 1e-10],
+    import_Nm=[1e-12, 1e-9],
+    radial_import_water=[1e-22, 1e-12],
+    C_hexose_root=[1e-4, 2e-4],
+    root_exchange_surface=[1e-3, 1e-2]
+)
+
+is_flow = dict(
+    Nm=False,
+    hexose_exudation=True,
+    import_Nm=True,
+    radial_import_water=True,
+    C_hexose_root=False,
+    root_exchange_surface=True
 )
 
 class Logger:
@@ -70,7 +91,7 @@ class Logger:
                     on_shoot_logs=False)
     
     heavy_log = dict(recording_images=True, recording_off_screen=True, auto_camera_position=False,
-                     plotted_property="C_hexose_root", flow_property=False, show_soil=False, imposed_clim=usual_clims["C_hexose_root"],
+                     plotted_property="import_Nm", flow_property=True, show_soil=False, imposed_clim=usual_clims["import_Nm"],
                     recording_mtg=False,
                     recording_raw=True,
                     final_snapshots=True,
@@ -109,19 +130,25 @@ class Logger:
                 elif name == "shoot":
                     self.props[name] = data_structure.get_vertex_property(2)["roots"]
                 else:
-                    print("ERROR, unknown MTG")
+                    error = "unknown MTG"
+                    self.logger_output.error(error)
+                    raise error
             # Elif a dict of properties have already been provided
             elif str(type(data_structure)) == "<class 'dict'>":
                 if name == "soil":
                     self.props[name] = data_structure
                 else:
-                    print("[WARNING] Unknown data structure has been passed to logger")
+                    error = "Unknown data structure has been passed to logger"
+                    self.logger_output.error(error)
+                    raise error
             else:
-                print("[WARNING] Unknown data structure has been passed to logger")
+                error = "Unknown data structure has been passed to logger"
+                self.logger_output.error(error)
+                raise error
 
         self.components = components
         self.fields = {f.name: f.metadata for model in self.components for f in fields(model) if f.metadata["variable_type"] == "state_variable"}
-        self.outputs_dirpath = outputs_dirpath
+        self.outputs_dirpath = outputs_dirpath + " *"
         self.output_variables = output_variables
         self.scenario = scenario
         self.summable_output_variables = []
@@ -213,8 +240,34 @@ class Logger:
                 self.log_mtg_coordinates()
             self.init_images_plotter()
 
-        logging.basicConfig(filename=os.path.join(outputs_dirpath, '[RUNNING] simulation.log'), filemode='w',
-                                format='%(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+        class OverwriteHandler(logging.StreamHandler):
+            """Custom handler to overwrite the console output on the same line."""
+            
+            def emit(self, record):
+                log_entry = self.format(record)
+                sys.stdout.write(f"\r{log_entry}   ")  # Overwrite the same line
+                sys.stdout.flush()  # Ensure immediate output
+
+
+        logging_level = logging.DEBUG
+        self.logger_output = logging.getLogger("Simulation_Logger")
+        self.logger_output.setLevel(logging_level)
+        
+        # Create a console handler (prints to stdout)
+        console_handler = OverwriteHandler()
+        console_handler.setLevel(logging_level)
+        console_handler.setFormatter(logging.Formatter("%(message)s"))
+        # Create a file handler (saves to a log file)
+        file_handler = logging.FileHandler(os.path.join(self.outputs_dirpath, '[RUNNING] simulation.log'))
+        file_handler.setLevel(logging_level)
+        file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+
+        # Attach handlers to the logger
+        self.logger_output.addHandler(console_handler)
+        self.logger_output.addHandler(file_handler)
+
+        self.logger_output.info(f"Launching {os.path.basename(outputs_dirpath)}...")
+        print("\r")
 
         self.start_time = timeit.default_timer()
         self.previous_step_start_time = self.start_time
@@ -308,11 +361,8 @@ class Logger:
             self.log_mtg_coordinates()
 
         if self.simulation_time_in_hours > 0:
-            self.log = f"\r[RUNNING] {self.simulation_time_in_hours} hours | step took {round(self.current_step_start_time - self.previous_step_start_time, 1)} s"
-            if self.echo:
-                sys.stdout.write(self.log)
-                # print(self.log, end="\r")
-            logging.info(self.log + f"| {time.strftime('%H:%M:%S', time.gmtime(int(self.elapsed_time)))} since simulation started")
+            self.log = f"   [RUNNING] {self.simulation_time_in_hours} hours | step took {round(self.current_step_start_time - self.previous_step_start_time, 1)} s \r"
+            self.logger_output.info(self.log)
 
         if self.recording_sums:
             self.recording_summed_MTG_properties_to_csv()
@@ -420,8 +470,7 @@ class Logger:
         self.log_xarray += [self.mtg_to_dataset(variables=self.output_variables, time=self.simulation_time_in_hours)]
         # 10000 corresponds to 14Gb on disk, so should be to 2000 when testing several scenarios to avoid saturating memory
         if sys.getsizeof(self.log_xarray) > 2000:
-            print("")
-            print("[INFO] Merging stored properties data in one xarray dataset...", flush=True)
+            self.logger_output.info("Merging stored properties data in one xarray dataset...")
             self.write_to_disk(self.log_xarray)
             # Check save maybe
             self.log_xarray = []
@@ -690,21 +739,21 @@ class Logger:
 
 
     def stop(self):
-
         if self.echo:
-            logging.shutdown()
+            print("\r")
             elapsed_at_simulation_end = self.elapsed_time
             printed_time = time.strftime('%H:%M:%S', time.gmtime(int(elapsed_at_simulation_end)))
-            print("")  # to receive the flush
             if len(self.exceptions) == 0:
-                print(f"[INFO] Simulation ended after {printed_time} min without error")
-                os.rename(os.path.join(self.outputs_dirpath, "[RUNNING] simulation.log"), os.path.join(self.outputs_dirpath, "[FINISHED] simulation.log"))
+                self.logger_output.info(f"Simulation ended after {printed_time} min without error")
             else:
-                print(f"[INFO] Simulation ended after {printed_time} min, INTERRUPTED BY THE FOLLOWING ERRORS : ")
+                self.logger_output.info(f"Simulation ended after {printed_time} min, INTERRUPTED BY THE FOLLOWING ERRORS : ")
                 for error in self.exceptions:
-                    print(" - ", error)
-                os.rename(os.path.join(self.outputs_dirpath, "[RUNNING] simulation.log"), os.path.join(self.outputs_dirpath, "[STOPPED] simulation.log"))
-            print("[INFO] Now proceeding to data writing on disk...")
+                    print("\r") # Receiver to avoid superimposition when printing errors
+                    self.logger_output.error(error)
+            print("\r")
+            self.logger_output.info("Now proceeding to data writing on disk...")
+            print("\r")
+            
 
         if self.recording_sums:
             if self.compare_to_ref_barcode:
@@ -733,42 +782,46 @@ class Logger:
         if self.final_snapshots:
 
             if not self.recording_mtg:
-                print("[INFO] Saving the final state of the MTG...")
+                self.logger_output.info("Saving the final state of the MTG...")
                 self.recording_mtg_files()
 
             if not self.recording_raw:
-                print("[INFO] Saving a final state xarray...")
+                self.logger_output.info("Saving a final state xarray...")
                 self.write_to_disk([self.mtg_to_dataset(variables=self.output_variables, time=self.simulation_time_in_hours)], custom_name="merged.nc")
             
             if not self.recording_images:
-                print("[INFO] Saving a final snapshot...")
+                self.logger_output.info("Saving a final snapshot...")
                 # try:
                 if not self.static_mtg:
                     self.log_mtg_coordinates()
                 self.init_images_plotter()
                 for prop, clim in usual_clims.items():
+                    self.logger_output.info(f"plotting final {prop}...")
                     self.plotted_property = prop
                     self.imposed_clim = clim
+                    self.flow_property = is_flow[prop] # TODO for all of this use metadate instead!!
                     self.recording_images_with_pyvista(custom_name=f"{self.plotted_property}_", 
                                                        parallel_compression=False, recording_video=False)
+                    if self.flow_property:
+                        unit = self.fields[prop]["unit"] + ".m-1"
+                    else:
+                        unit = self.fields[prop]["unit"]
+                
                     custom_colorbar(folderpath=self.root_images_dirpath, label=prop, vmin=clim[0], vmax=clim[1], 
-                                    colormap="jet", vertical=False, log_scale=True, filename=f"{prop}_colorbar.png")
+                                    colormap="jet", vertical=False, log_scale=True, filename=f"{prop}_colorbar.png", unit = unit)
                     self.plotter.screenshot(os.path.join(self.outputs_dirpath, f"root_images/{self.plotted_property}_{self.simulation_time_in_hours}.png"),
                                         transparent_background=True, scale=5)
-                # except:
-                #     print("Failed to save scene snapshot")
 
             else:
                 if self.export_3D_scene:
-                    print("[INFO] Saving a final snapshot...")
+                    self.logger_output.info("Saving a final snapshot...")
                     export_scene_to_gltf(output_path=os.path.join(self.root_images_dirpath, f"{self.simulation_time_in_hours}.gltf"),
                                         plotter=self.plotter, clim=self.clim)
-                    
 
         if self.recording_raw:
             # For saved xarray datasets
             if len(self.log_xarray) > 0:
-                print("[INFO] Merging stored properties data in one xarray dataset...")
+                self.logger_output.info("Merging stored properties data in one xarray dataset...")
                 self.write_to_disk(self.log_xarray)
                 del self.log_xarray
 
@@ -812,8 +865,20 @@ class Logger:
 
         if self.echo:
             time_writing_on_disk = self.elapsed_time - elapsed_at_simulation_end
-            print(f"[INFO] Successfully wrote data on disk after {round(time_writing_on_disk / 60, 1)} minutes")
-            print("[LOGGER CLOSES]")
+            print("\r")
+            self.logger_output.info(f"Successfully wrote data on disk after {round(time_writing_on_disk / 60, 1)} minutes")
+            print("\r")
+            self.logger_output.info("[LOGGER CLOSES]")
+
+            if len(self.exceptions) == 0:
+                logging.shutdown()
+                os.rename(os.path.join(self.outputs_dirpath, "[RUNNING] simulation.log"), os.path.join(self.outputs_dirpath, "[FINISHED] simulation.log"))
+            else:
+                logging.shutdown()
+                os.rename(os.path.join(self.outputs_dirpath, "[RUNNING] simulation.log"), os.path.join(self.outputs_dirpath, "[STOPPED] simulation.log"))
+        
+        shutil.rmtree(self.outputs_dirpath[:-2])
+        os.rename(self.outputs_dirpath, self.outputs_dirpath[:-2])
 
         # self.mtg_persistent_homology(g=self.g)
 
