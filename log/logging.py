@@ -210,14 +210,16 @@ class Logger:
             self.create_or_empty_directory(self.shoot_properties_dirpath)
 
         if self.output_variables == {}:
+            descriptors = []
             for model in self.components:
                 self.summable_output_variables += model.extensive_variables + model.non_inertial_extensive
                 self.meanable_output_variables += model.intensive_variables + model.non_inertial_intensive + model.massic_concentration
                 self.plant_scale_state += model.plant_scale_state
+                descriptors += model.descriptor
                 available_inputs = [i for i in model.inputs if
                                     i in self.props.keys()]  # To prevent getting inputs that are not provided neither from another model nor mtg
                 self.output_variables.update(
-                    {f.name: f.metadata for f in fields(model) if f.name in self.summable_output_variables + self.meanable_output_variables + self.plant_scale_state})
+                    {f.name: f.metadata for f in fields(model) if f.name in self.summable_output_variables + self.meanable_output_variables + self.plant_scale_state + descriptors})
                 self.units_for_outputs.update({f.name: f.metadata["unit"] for f in fields(model) if
                                                f.name in self.summable_output_variables + self.meanable_output_variables + self.plant_scale_state})
 
@@ -877,8 +879,10 @@ class Logger:
                 logging.shutdown()
                 os.rename(os.path.join(self.outputs_dirpath, "[RUNNING] simulation.log"), os.path.join(self.outputs_dirpath, "[STOPPED] simulation.log"))
         
-        shutil.rmtree(self.outputs_dirpath[:-2])
-        os.rename(self.outputs_dirpath, self.outputs_dirpath[:-2])
+        finished_shown_path = self.outputs_dirpath[:-2]
+        if os.path.exists(finished_shown_path):
+            shutil.rmtree(finished_shown_path)
+        os.rename(self.outputs_dirpath, finished_shown_path)
 
         # self.mtg_persistent_homology(g=self.g)
 
