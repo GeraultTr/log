@@ -3,6 +3,10 @@ import numpy as np
 import os
 import threading
 
+# Units
+import re
+from pint import UnitRegistry
+
 from openalea.mtg.plantframe import color
 from openalea.mtg import turtle as turt
 import openalea.plantgl.all as pgl
@@ -12,7 +16,7 @@ import pyvista as pv
 from math import cos, sin, floor
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-from matplotlib.ticker import LogFormatterSciNotation
+from matplotlib.ticker import LogFormatterSciNotation, ScalarFormatter
 from matplotlib.backend_bases import MouseButton
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
@@ -21,6 +25,7 @@ import numpy as np
 from time import sleep
 from openalea.mtg.traversal import pre_order2
 
+ureg = UnitRegistry()
 
 def get_root_visitor():
     """
@@ -128,13 +133,17 @@ def custom_colorbar(
         unit="mol.s-1.g-1",
         filename = "colormap.png"):
     
+    label = label.replace("_", " ")
+    
     # Set up normalization and colormap
     if log_scale:
         norm = mcolors.LogNorm(vmin=vmin, vmax=vmax)
-        formatter = LogFormatterSciNotation(base=10, labelOnlyBase=False)
+        formatter = LogFormatterSciNotation(base=10, labelOnlyBase=True)
     else:
         norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
-        formatter = None
+        formatter = ScalarFormatter(useMathText=True)
+        formatter.set_scientific(True)
+        formatter.set_powerlimits((-2, 2))  # Use scientific notation only outside this range
 
     cmap = plt.get_cmap(colormap)
     if vertical:
@@ -145,26 +154,26 @@ def custom_colorbar(
         fig, ax = plt.subplots(figsize=(5, 1))  # Adjust size (width=1 inch, height=5 inches)
         fig.subplots_adjust(left=0.05, right=0.5, top=0.6, bottom=0.5)
     
-    
-
     # Create the colorbar
-    if vertical:
-        cb = plt.colorbar(
-            plt.cm.ScalarMappable(norm=norm, cmap=cmap),
-            cax=ax,
-            orientation='vertical',
-            format=formatter
-        )
-    else:
-        cb = plt.colorbar(
+    cb = plt.colorbar(
         plt.cm.ScalarMappable(norm=norm, cmap=cmap),
         cax=ax,
-        orientation='horizontal',
-        format=formatter
-        )
+        orientation='vertical' if vertical else 'horizontal',
+        format=formatter)
+    
+    parsable_unit = unit_from_str(unit)
+    if parsable_unit == '$$':
+        parsable_unit = 'adim'
+        
+    cb.set_label(f"{label} ({parsable_unit})", fontsize=7)
+    cb.ax.tick_params(labelsize=6)
 
-    cb.set_label(f"{label} ({unit})", fontsize=8)  # Smaller label size
-    cb.ax.tick_params(labelsize=6)  # Smaller tick labels
+    # Remove or adjust offset text to avoid overlap
+    if not log_scale:
+        offset_text = cb.ax.yaxis.get_offset_text() if vertical else cb.ax.xaxis.get_offset_text()
+        offset_text.set_size(6)
+        offset_text.set_va('bottom') if vertical else offset_text.set_ha('left')
+        offset_text.set_position((0, 1.02) if vertical else (1.02, 0))  # Adjust position to avoid label overlap
     
     # Save the figure with a transparent background
     fig.savefig(os.path.join(folderpath, filename), dpi=300, transparent=True, bbox_inches='tight')
@@ -172,6 +181,30 @@ def custom_colorbar(
     return filename
 
 
+def unit_from_str(unit):
+    to_ureg = ureg(expand_compact_units(unit.replace("-", "^-")))
+    to_latex = latex_unit_compact(to_ureg)
+
+    return to_latex
+
+def expand_compact_units(unit_str):
+    # Replace e.g., "m3" with "m**3" but only if followed by a digit
+    unit_str = re.sub(r"([a-zA-Z]+)(\d+)", r"\1**\2", unit_str)
+    # Replace "." with "*", in case it's dot-separated
+    unit_str = unit_str.replace('.', '*')
+    return unit_str
+
+def latex_unit_compact(unit):
+    # unit.units is a UnitsContainer: {unit_name: exponent}
+    parts = []
+    for base_unit, exponent in unit.units._units.items():
+        # Format each unit in LaTeX with abbreviations
+        unit_str = f"\\mathrm{{{ureg.Unit(base_unit):~}}}"  # ~ = abbreviated
+        if exponent != 1:
+            unit_str += f"^{{{int(exponent)}}}"
+        parts.append(unit_str)
+    
+    return "$" + " \\cdot ".join(parts) + "$"
 
 def prepareScene(scene, width=1200, height=1200, scale=0.8, x_center=0., y_center=0., z_center=0.,
                  x_cam=0., y_cam=0., z_cam=-1.5, grid=False):
@@ -573,7 +606,7 @@ def lines_from_segments(x1, y1, z1, x2, y2, z2):
     return poly
 
 
-def plot_mtg_alt_old(g, cmap_property, flow_property=True, root_hairs=False):
+def plot_mtg_alt_old(g, cmap_property, flow_property=None, root_hairs=False):
     props = g.properties()
     vertices = list(props["struct_mass"].keys())
     root_gen = g.component_roots_at_scale_iter(g.root, scale=1)
@@ -648,9 +681,11 @@ def plot_mtg_alt_old(g, cmap_property, flow_property=True, root_hairs=False):
     else:
         return root_system, color_property, None
 
-def plot_mtg_alt(g, cmap_property, flow_property=True, root_hairs=False):
+def plot_mtg_alt(g, cmap_property, normalize_by=None, root_hairs=False, vid_filter=None):
     props = g.properties()
     vertices = [vid for vid in g.vertices(scale=g.max_scale()) if props["struct_mass"][vid] > 0]
+    if vid_filter:
+        vertices = [vid for vid in vertices if vid in vid_filter]
             
     line = lines_from_segments(x1=[props["x1"][v] for v in vertices],
                                 y1=[props["y1"][v] for v in vertices],
@@ -665,10 +700,10 @@ def plot_mtg_alt(g, cmap_property, flow_property=True, root_hairs=False):
         root_hairs_line["radius"] = [props["radius"][v] + props["root_hair_length"][v] for v in vertices] * 2
         root_hairs_tubes = root_hairs_line.tube(scalars="radius", absolute=True)
 
-    if flow_property:
+    if normalize_by is not None:
         # color_property = []
-        color_property = [props[cmap_property][v] / props["length"][v] if props["length"][v] > 0 else 0 for v in vertices]
-        line[cmap_property + ".m-1"] = color_property * 2
+        color_property = [props[cmap_property][v] / props[normalize_by][v] if props[normalize_by][v] > 0 else 0 for v in vertices]
+        line[cmap_property + " normalized"] = color_property * 2
     else:
         # color_property = [props[cmap_property][v] for v in root]
         color_property = [props[cmap_property][v] for v in vertices]
@@ -723,10 +758,7 @@ def shoot_plantgl_to_mesh(g, cmap_property="", scale=1.):
         geom.apply(t)
         mesh = t.discretization
         tmesh = trimesh.Trimesh(mesh.pointList, mesh.indexList)
-        if vid == 19:
-            shoot_mesh_dict[vid] = pv.wrap(tmesh).scale([scale/2, scale/2, scale])
-        else:
-            shoot_mesh_dict[vid] = pv.wrap(tmesh).scale([scale, scale, scale])
+        shoot_mesh_dict[vid] = pv.wrap(tmesh).scale([scale, scale, scale])
 
     return shoot_mesh_dict
 
@@ -756,7 +788,7 @@ class VertexPicker:
         return ((x1-x2)**2 + (y1-y2)**2 + (z1-z2)**2)**0.5
     
 
-def export_scene_to_gltf(output_path, plotter, clim, colormap="jet", parallel_compression=True):
+def export_scene_to_gltf(output_path, plotter, clim, colormap="jet", parallel_compression=True, log_scale=True):
     """
     Scene exporter to 3D GLTF to make animations
     WARNING : Doesn't support transparent soil yet as we limit to one multiblock only to avoid duplicated orthogonal bug that has been noticed in export
@@ -788,7 +820,7 @@ def export_scene_to_gltf(output_path, plotter, clim, colormap="jet", parallel_co
                                 polydata = block
 
                             # Add the PolyData with colors to the export plotter
-                            export_plotter.add_mesh(polydata, cmap=colormap, clim=clim, specular=None, log_scale=True)
+                            export_plotter.add_mesh(polydata, cmap=colormap, clim=clim, specular=None, log_scale=log_scale)
                             plotted_multiblocks += 1
 
             else:

@@ -18,38 +18,33 @@ from openalea.mtg.traversal import pre_order2, post_order
 from openalea.mtg import turtle as turt
 from log.visualize import plot_mtg, plot_mtg_alt, soil_voxels_mesh, shoot_plantgl_to_mesh, VertexPicker, export_scene_to_gltf, custom_colorbar
 
-# usual_clims = dict(
-#     Nm=[1e-4, 1.],
-#     hexose_exudation=[1e-13, 1e-9],
-#     import_Nm=[1e-12, 1e-7],
-#     radial_import_water=[1e-22, 1e-16],
-#     C_hexose_root=[1e-4, 2e-4],
-#     root_exchange_surface=[1e-5, 1e-4]
-# )
 
 # with 24h static strategy
 usual_clims = dict(
-    Nm=[1e-4, 1e-3],
-    hexose_exudation=[1e-13, 1e-10],
-    import_Nm=[1e-12, 1e-9],
-    radial_import_water=[1e-22, 1e-12],
-    C_hexose_root=[1e-4, 2e-4],
-    root_exchange_surface=[1e-3, 1e-2]
+    # Nm=                             dict(bounds=[0.99e-4, 1e-3],   show_as_log=True,   normalize_by=None), 
+    # hexose_exudation=               dict(bounds=[1e-13, 1e-9],  show_as_log=True,   normalize_by="length"),
+    import_Nm=                      dict(bounds=[1e-12, 1e-9],  show_as_log=True,   normalize_by="length"),
+    # radial_import_water=            dict(bounds=None,           show_as_log=False,  normalize_by="length"), #[1e-22, 1e-12],
+    # C_hexose_root=                  dict(bounds=[0.99e-4, 1e-3],   show_as_log=True,   normalize_by=None), #prev 
+    # root_exchange_surface=          dict(bounds=None,           show_as_log=True,   normalize_by=None), # prev [1e-3, 1e-2]
+    # tissue_formation_time=          dict(bounds=[0, 60],        show_as_log=False,  normalize_by=None),
+    # kr_symplasmic_water=            dict(bounds=None,           show_as_log=False,   normalize_by="cylinder_surface"),
+    # kr_apoplastic_water=            dict(bounds=None,           show_as_log=False,   normalize_by="cylinder_surface"),
+    # kr=                             dict(bounds=None,           show_as_log=False,   normalize_by="cylinder_surface"),
+    # K=                             dict(bounds=None,           show_as_log=False,   normalize_by="inverse_length"),
+    # xylem_Nm=                       dict(bounds=None,           show_as_log=False,   normalize_by=None),
+    # xylem_pressure_out=             dict(bounds=None,           show_as_log=False,   normalize_by=None),
+    # axial_export_water_up=          dict(bounds=None,           show_as_log=False,   normalize_by=None),
+    endodermis_conductance_factor=          dict(bounds=[0, 1],           show_as_log=False,   normalize_by=None),
+    exodermis_conductance_factor=          dict(bounds=[0, 1],           show_as_log=False,   normalize_by=None),
+    xylem_differentiation_factor=          dict(bounds=[0, 1],           show_as_log=False,   normalize_by=None),
 )
 
-is_flow = dict(
-    Nm=False,
-    hexose_exudation=True,
-    import_Nm=True,
-    radial_import_water=True,
-    C_hexose_root=False,
-    root_exchange_surface=True
-)
 
 class Logger:
 
     light_log = dict(recording_images=False, recording_off_screen=True, auto_camera_position=False,
-                    plotted_property="import_Nm", flow_property=True, show_soil=False, imposed_clim=usual_clims["import_Nm"],
+                    plotted_property="import_Nm", flow_property=True, show_soil=False, imposed_clim=usual_clims["import_Nm"]["bounds"],
                     recording_mtg=False,
                     recording_raw=False,
                     final_snapshots=True,
@@ -63,7 +58,7 @@ class Logger:
                     on_shoot_logs=False)
     
     medium_log_focus_images = dict(recording_images=True, recording_off_screen=True, auto_camera_position=False,
-                    plotted_property="import_Nm", flow_property=True, show_soil=False, imposed_clim=usual_clims["import_Nm"],
+                    plotted_property="import_Nm", flow_property=False, show_soil=False, imposed_clim=usual_clims["import_Nm"]["bounds"],
                     recording_mtg=False,
                     recording_raw=False,
                     final_snapshots=True,
@@ -77,7 +72,7 @@ class Logger:
                     on_shoot_logs=True)
     
     medium_log_focus_properties = dict(recording_images=False, recording_off_screen=True, auto_camera_position=False,
-                    plotted_property="import_Nm", flow_property=True, show_soil=False, imposed_clim=usual_clims["import_Nm"],
+                    plotted_property="import_Nm", flow_property=True, show_soil=False, imposed_clim=usual_clims["import_Nm"]["bounds"],
                     recording_mtg=False,
                     recording_raw=True,
                     final_snapshots=False,
@@ -91,7 +86,7 @@ class Logger:
                     on_shoot_logs=False)
     
     heavy_log = dict(recording_images=True, recording_off_screen=True, auto_camera_position=False,
-                     plotted_property="import_Nm", flow_property=True, show_soil=False, imposed_clim=usual_clims["import_Nm"],
+                     plotted_property="import_Nm", flow_property=False, show_soil=False, imposed_clim=usual_clims["import_Nm"]["bounds"],
                     recording_mtg=False,
                     recording_raw=True,
                     final_snapshots=True,
@@ -107,8 +102,8 @@ class Logger:
     def __init__(self, model_instance, components, outputs_dirpath="",
                  output_variables={}, scenario={"default": 1}, time_step_in_hours=1,
                  logging_period_in_hours=1,
-                 recording_sums=False, recording_raw=False, recording_mtg=False, recording_images=False, recording_off_screen=False,
-                 static_mtg=False, auto_camera_position=False, imposed_clim=True,
+                 recording_sums=False, recording_raw=False, recording_mtg=False, recording_images=False, root_colormap="jet", log_scale=True,
+                 recording_off_screen=False, static_mtg=False, auto_camera_position=False, imposed_clim=True,
                  recording_performance=False,
                  recording_shoot=False,
                  final_snapshots=False,
@@ -166,6 +161,8 @@ class Logger:
         if "root" not in self.data_structures.keys():
             recording_images = False
         self.recording_images = recording_images
+        self.root_colormap = root_colormap
+        self.log_scale = log_scale
         self.static_mtg = static_mtg
         self.auto_camera_position = auto_camera_position
         self.imposed_clim=imposed_clim
@@ -189,7 +186,6 @@ class Logger:
                 
         self.echo = echo
         self.log = ""
-        # TODO : add a scenario named folder
         self.root_images_dirpath = os.path.join(self.outputs_dirpath, "root_images")
         self.MTG_files_dirpath = os.path.join(self.outputs_dirpath, "MTG_files")
         self.MTG_barcodes_dirpath = os.path.join(self.outputs_dirpath, "MTG_barcodes")
@@ -210,12 +206,13 @@ class Logger:
             self.create_or_empty_directory(self.shoot_properties_dirpath)
 
         if self.output_variables == {}:
-            descriptors = []
+            # descriptors = []
+            descriptors = ["root_order", "label", "type", "axis_index"]
             for model in self.components:
                 self.summable_output_variables += model.extensive_variables + model.non_inertial_extensive
                 self.meanable_output_variables += model.intensive_variables + model.non_inertial_intensive + model.massic_concentration
                 self.plant_scale_state += model.plant_scale_state
-                descriptors += model.descriptor
+                # descriptors += model.descriptor
                 available_inputs = [i for i in model.inputs if
                                     i in self.props.keys()]  # To prevent getting inputs that are not provided neither from another model nor mtg
                 self.output_variables.update(
@@ -291,7 +288,9 @@ class Logger:
         else:
             self.clim = self.imposed_clim
 
-        custom_colorbar(folderpath=self.root_images_dirpath, label=self.plotted_property, vmin=self.clim[0], vmax=self.clim[1], colormap="jet", vertical=False, log_scale=True)
+        log_scale = False
+
+        custom_colorbar(folderpath=self.root_images_dirpath, label=self.plotted_property, vmin=self.clim[0], vmax=self.clim[1], colormap=self.root_colormap, vertical=False, log_scale=log_scale)
 
         sizes = {"landscape": [1920, 1080], "portrait": [1088, 1920], "square": [1080, 1080],
                     "small_height": [960, 1280]}
@@ -313,9 +312,9 @@ class Logger:
 
         # Then add initial states of plotted compartments
         root_system_mesh, color_property, root_hair_mesh = plot_mtg_alt(self.data_structures["root"], cmap_property=self.plotted_property, root_hairs=False)
-        self.current_mesh = self.plotter.add_mesh(root_system_mesh, cmap="jet", clim=self.clim, show_edges=False, log_scale=False)
+        self.current_mesh = self.plotter.add_mesh(root_system_mesh, cmap=self.root_colormap, clim=self.clim, show_edges=False, log_scale=self.log_scale)
         if root_hair_mesh:
-            self.root_hair_current_mesh = self.plotter.add_mesh(root_hair_mesh, cmap="jet", opacity=0.05)
+            self.root_hair_current_mesh = self.plotter.add_mesh(root_hair_mesh, cmap=self.root_colormap, opacity=0.05)
         self.plot_text = self.plotter.add_text(f"Simulation starting...", position="upper_left")
         if "soil" in self.data_structures.keys() and self.show_soil:
             soil_grid = soil_voxels_mesh(self.data_structures["root"], self.data_structures["soil"],
@@ -527,20 +526,21 @@ class Logger:
         with open(os.path.join(self.MTG_files_dirpath, f'data_{self.simulation_time_in_hours}.pckl'), "wb") as f:
             pickle.dump(self.data_structures, f)
 
-    def recording_images_with_pyvista(self, custom_name="", parallel_compression=True, recording_video=True):
+    def recording_images_with_pyvista(self, custom_name="", parallel_compression=True, recording_video=True, normalize_by=None):
 
         # This is required since the dictionnary is not emptied when using plotter.remove_actor. However this is not a problem to the use of the remove_actor in the renderer for next time_step.
         self.plotter.renderer.actors.clear()
 
         if "root" in self.data_structures.keys():
             # TODO : step back according to max(||x2-x1||, ||y2-y1||, ||z2-z1||)
-            root_system_mesh, color_property, root_hair_mesh = plot_mtg_alt(self.data_structures["root"], cmap_property=self.plotted_property, flow_property=self.flow_property, root_hairs=False)
+            root_system_mesh, color_property, root_hair_mesh = plot_mtg_alt(self.data_structures["root"], cmap_property=self.plotted_property, normalize_by=normalize_by, root_hairs=False)
             if 0. in color_property:
                 color_property.remove(0.)
 
             # Accounts for smooth color bar transitions for videos.
-            self.prop_mins = self.prop_mins[1:] + [min(color_property)]
-            self.prop_maxs = self.prop_maxs[1:] + [max(color_property)]
+            if len(color_property) > 0:
+                self.prop_mins = self.prop_mins[1:] + [min(color_property)]
+                self.prop_maxs = self.prop_maxs[1:] + [max(color_property)]
 
             mean_mins = np.mean([e for e in self.prop_mins if e is not None])
             mean_maxs = np.mean([e for e in self.prop_maxs if e is not None])
@@ -566,11 +566,9 @@ class Logger:
             else:
                 self.clim = self.imposed_clim
 
-            log_scale = True
-
-            self.current_mesh = self.plotter.add_mesh(root_system_mesh, cmap="jet",
+            self.current_mesh = self.plotter.add_mesh(root_system_mesh, cmap=self.root_colormap,
                                                       clim=self.clim, show_edges=False,
-                                                      specular=1., log_scale=log_scale)
+                                                      specular=1., log_scale=self.log_scale)
             if root_hair_mesh:
                 self.plotter.remove_actor(self.root_hair_current_mesh)
                 self.root_hair_current_mesh = self.plotter.add_mesh(root_hair_mesh, cmap="Greys", opacity=0.05)
@@ -605,7 +603,7 @@ class Logger:
                                     transparent_background=True, scale=5)
         else:
             export_scene_to_gltf(output_path=os.path.join(self.root_images_dirpath, f"{custom_name}{self.simulation_time_in_hours}.gltf"),
-                                        plotter=self.plotter, clim=self.clim, parallel_compression=parallel_compression)
+                                        plotter=self.plotter, clim=self.clim, parallel_compression=parallel_compression, colormap=self.root_colormap, log_scale=self.log_scale)
         
         if recording_video:
             self.plotter.write_frame()
@@ -769,7 +767,6 @@ class Logger:
                 os.path.join(self.MTG_properties_summed_dirpath, "plant_scale_properties.csv"))
 
         
-
         final_interactive_picking = True
         if self.recording_images and final_interactive_picking and not self.recording_off_screen:
             # We are using the already plotted mesh to activate the picker and enable interactive mode
@@ -786,31 +783,62 @@ class Logger:
             if not self.recording_mtg:
                 self.logger_output.info("Saving the final state of the MTG...")
                 self.recording_mtg_files()
+                if hasattr(self.model_instance, "shoot"):
+                    self.model_instance.shoot.adel_wheat.scene(self.model_instance.g_shoot).save(os.path.join(self.root_images_dirpath, f"Final_scene_{self.time_step_in_hours}.bgeom"))
 
             if not self.recording_raw:
                 self.logger_output.info("Saving a final state xarray...")
                 self.write_to_disk([self.mtg_to_dataset(variables=self.output_variables, time=self.simulation_time_in_hours)], custom_name="merged.nc")
             
             if not self.recording_images:
+                g = self.data_structures["root"]
+                props = g.properties()
+                vertices = [vid for vid in g.vertices(scale=g.max_scale()) if props["struct_mass"][vid] > 0]
                 self.logger_output.info("Saving a final snapshot...")
                 # try:
                 if not self.static_mtg:
                     self.log_mtg_coordinates()
                 self.init_images_plotter()
-                for prop, clim in usual_clims.items():
+                for prop, formatting_options in usual_clims.items():
                     self.logger_output.info(f"plotting final {prop}...")
                     self.plotted_property = prop
-                    self.imposed_clim = clim
-                    self.flow_property = is_flow[prop] # TODO for all of this use metadate instead!!
+                    self.log_scale = formatting_options["show_as_log"]
+                    normalize_by = formatting_options["normalize_by"] # TODO for all of this use metadate instead!!
+
+                    if isinstance(formatting_options["bounds"], list):
+                        self.imposed_clim = formatting_options["bounds"]
+                    else:
+                        if normalize_by is not None:
+                            color_property = [props[prop][v] / props[normalize_by][v] for v in vertices]
+                        else:
+                            color_property = [props[prop][v] for v in vertices]
+                        min_value = min(color_property)
+                        max_value = max(color_property)
+                        if min_value < 0 and self.log_scale:
+                            # If the range is completely negative, not the right visualization option #TODO : add an option to switch all to positive and show negative in the legend
+                            if max_value < 0:
+                                self.logger_output.error("Using a negative property with a log scale.")
+                            else:
+                                percentile = 10
+                                while percentile < 50 and min_value <= 0:
+                                    self.logger_output.info(f"Using a negative lower bound with a log scale. Rasing lower bound to {percentile}% percentile")
+                                    min_value = np.percentile(color_property, percentile)
+                                    percentile += 10
+                                
+                                # If still negative after this attempt, not the right visualization option, raise an error
+                                if min_value < 0:
+                                    self.logger_output.error("Using a mostly negative property with a log scale.")
+                        self.imposed_clim = [min_value, max_value]
+                    
                     self.recording_images_with_pyvista(custom_name=f"{self.plotted_property}_", 
-                                                       parallel_compression=False, recording_video=False)
-                    if self.flow_property:
-                        unit = self.fields[prop]["unit"] + ".m-1"
+                                                       parallel_compression=False, recording_video=False, normalize_by=normalize_by)
+                    if normalize_by is not None:
+                        unit = self.fields[prop]["unit"] + f"/({self.fields[normalize_by]['unit']})"
                     else:
                         unit = self.fields[prop]["unit"]
-                
-                    custom_colorbar(folderpath=self.root_images_dirpath, label=prop, vmin=clim[0], vmax=clim[1], 
-                                    colormap="jet", vertical=False, log_scale=True, filename=f"{prop}_colorbar.png", unit = unit)
+
+                    custom_colorbar(folderpath=self.root_images_dirpath, label=prop, vmin=self.imposed_clim[0], vmax=self.imposed_clim[1], 
+                                    colormap=self.root_colormap, vertical=False, log_scale=self.log_scale, filename=f"{prop}_colorbar.png", unit = unit)
                     self.plotter.screenshot(os.path.join(self.outputs_dirpath, f"root_images/{self.plotted_property}_{self.simulation_time_in_hours}.png"),
                                         transparent_background=True, scale=5)
 
@@ -818,7 +846,7 @@ class Logger:
                 if self.export_3D_scene:
                     self.logger_output.info("Saving a final snapshot...")
                     export_scene_to_gltf(output_path=os.path.join(self.root_images_dirpath, f"{self.simulation_time_in_hours}.gltf"),
-                                        plotter=self.plotter, clim=self.clim)
+                                        plotter=self.plotter, clim=self.clim, colormap=self.root_colormap, log_scale=self.log_scale)
 
         if self.recording_raw:
             # For saved xarray datasets
