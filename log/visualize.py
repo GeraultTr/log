@@ -129,23 +129,41 @@ def custom_colorbar(
         colormap = "jet",
         log_scale=True,
         vertical=True,
+        discrete=False, mapping=None,
         label="",
         unit="mol.s-1.g-1",
         filename = "colormap.png"):
     
     label = label.replace("_", " ")
     
-    # Set up normalization and colormap
-    if log_scale:
-        norm = mcolors.LogNorm(vmin=vmin, vmax=vmax)
-        formatter = LogFormatterSciNotation(base=10, labelOnlyBase=True)
+    
+    if discrete:
+        N = len(mapping)
+        cmap = plt.get_cmap(colormap, N)
+        sorted_mapping = dict(sorted(mapping.items(), key=lambda x: x[0], reverse=True))
+        tickvalues = list(sorted_mapping.values())
+        ticklabels = list(sorted_mapping.keys())
+        # Boundaries are in between category numbers
+        boundaries = np.arange(np.min(tickvalues) - 0.5, np.max(tickvalues) + 1.5, 1)
+        norm = mcolors.BoundaryNorm(boundaries, cmap.N)
+        formatter = plt.FuncFormatter(lambda x, _: f"{int(x)}" if x in tickvalues else "")
     else:
-        norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
-        formatter = ScalarFormatter(useMathText=True)
-        formatter.set_scientific(True)
-        formatter.set_powerlimits((-2, 2))  # Use scientific notation only outside this range
+        cmap = plt.get_cmap(colormap)
+        # Set up normalization and colormap
+        if log_scale:
+            norm = mcolors.LogNorm(vmin=vmin, vmax=vmax)
+            formatter = LogFormatterSciNotation(base=10, labelOnlyBase=True)
+            
+            # Use only base-10 ticks
+            base_ticks = [10**i for i in range(int(np.floor(np.log10(vmin))), int(np.ceil(np.log10(vmax))) + 1)]
 
-    cmap = plt.get_cmap(colormap)
+        else:
+            norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+            formatter = ScalarFormatter(useMathText=True)
+            formatter.set_scientific(True)
+            formatter.set_powerlimits((-2, 2))  # Use scientific notation only outside this range
+
+    
     if vertical:
         fig, ax = plt.subplots(figsize=(1, 5))  # Adjust size (width=1 inch, height=5 inches)
         fig.subplots_adjust(left=0.5, right=0.6, top=0.95, bottom=0.05)
@@ -159,7 +177,12 @@ def custom_colorbar(
         plt.cm.ScalarMappable(norm=norm, cmap=cmap),
         cax=ax,
         orientation='vertical' if vertical else 'horizontal',
-        format=formatter)
+        format=formatter,
+        ticks=base_ticks if log_scale else None)
+    
+    if discrete:
+        cb.set_ticks(tickvalues)
+        cb.set_ticklabels(ticklabels)
     
     parsable_unit = unit_from_str(unit)
     if parsable_unit == '$$':
@@ -169,7 +192,7 @@ def custom_colorbar(
     cb.ax.tick_params(labelsize=6)
 
     # Remove or adjust offset text to avoid overlap
-    if not log_scale:
+    if not log_scale and not discrete:
         offset_text = cb.ax.yaxis.get_offset_text() if vertical else cb.ax.xaxis.get_offset_text()
         offset_text.set_size(6)
         offset_text.set_va('bottom') if vertical else offset_text.set_ha('left')

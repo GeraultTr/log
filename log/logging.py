@@ -21,33 +21,41 @@ from log.visualize import plot_mtg, plot_mtg_alt, soil_voxels_mesh, shoot_plantg
 
 # with 24h static strategy
 usual_clims = dict(
-    # Nm=                             dict(bounds=[0.99e-4, 1e-3],   show_as_log=True,   normalize_by=None), 
+    # Nm=                             dict(bounds=[1e-4, 3e-3],   show_as_log=True,   normalize_by=None), 
     # hexose_exudation=               dict(bounds=[1e-13, 1e-9],  show_as_log=True,   normalize_by="length"),
-    import_Nm=                      dict(bounds=[1e-12, 1e-9],  show_as_log=True,   normalize_by="length"),
+    # net_hexose_production_from_phloem=   dict(bounds=None,  show_as_log=False,   normalize_by="length"),
+    # import_Nm=                      dict(bounds=[1e-12, 5e-10],  show_as_log=True,   normalize_by="length"),
+    net_Nm_uptake=                  dict(bounds=[5e-12, 2e-10],  show_as_log=True,   normalize_by="length"),
+    # diffusion_Nm_soil=              dict(bounds=None,  show_as_log=True,   normalize_by="length"),
+    # diffusion_Nm_xylem=             dict(bounds=None,  show_as_log=False,   normalize_by="length"),
+    # export_Nm=                      dict(bounds=[1e-12, 5e-10],  show_as_log=True,   normalize_by="length"),
     # radial_import_water=            dict(bounds=None,           show_as_log=False,  normalize_by="length"), #[1e-22, 1e-12],
-    # C_hexose_root=                  dict(bounds=[0.99e-4, 1e-3],   show_as_log=True,   normalize_by=None), #prev 
-    # root_exchange_surface=          dict(bounds=None,           show_as_log=True,   normalize_by=None), # prev [1e-3, 1e-2]
+    C_hexose_root=                  dict(bounds=[0.99e-4, 1e-3],   show_as_log=True,   normalize_by=None), #prev 
+    # root_exchange_surface=          dict(bounds=[1e-6, 1e-3],           show_as_log=True,   normalize_by="length"), # prev [1e-3, 1e-2]
+    # phloem_exchange_surface=          dict(bounds=[1e-6, 1e-3],           show_as_log=True,   normalize_by="length"), # prev [1e-3, 1e-2]
     # tissue_formation_time=          dict(bounds=[0, 60],        show_as_log=False,  normalize_by=None),
-    # kr_symplasmic_water=            dict(bounds=None,           show_as_log=False,   normalize_by="cylinder_surface"),
-    # kr_apoplastic_water=            dict(bounds=None,           show_as_log=False,   normalize_by="cylinder_surface"),
-    # kr=                             dict(bounds=None,           show_as_log=False,   normalize_by="cylinder_surface"),
-    # K=                             dict(bounds=None,           show_as_log=False,   normalize_by="inverse_length"),
-    # xylem_Nm=                       dict(bounds=None,           show_as_log=False,   normalize_by=None),
-    # xylem_pressure_out=             dict(bounds=None,           show_as_log=False,   normalize_by=None),
+    # # kr_symplasmic_water=            dict(bounds=None,           show_as_log=False,   normalize_by="cylinder_surface"),
+    # # kr_apoplastic_water=            dict(bounds=None,           show_as_log=False,   normalize_by="cylinder_surface"),
+    # # kr=                             dict(bounds=None,           show_as_log=False,   normalize_by="cylinder_surface"),
+    # # K=                             dict(bounds=None,           show_as_log=False,   normalize_by="inverse_length"),
+    # xylem_Nm=                       dict(bounds=None,           show_as_log=True,   normalize_by=None),
+    # # xylem_pressure_out=             dict(bounds=None,           show_as_log=False,   normalize_by=None),
     # axial_export_water_up=          dict(bounds=None,           show_as_log=False,   normalize_by=None),
-    endodermis_conductance_factor=          dict(bounds=[0, 1],           show_as_log=False,   normalize_by=None),
-    exodermis_conductance_factor=          dict(bounds=[0, 1],           show_as_log=False,   normalize_by=None),
-    xylem_differentiation_factor=          dict(bounds=[0, 1],           show_as_log=False,   normalize_by=None),
+    # endodermis_conductance_factor=          dict(bounds=[0, 1],           show_as_log=False,   normalize_by=None),
+    # exodermis_conductance_factor=          dict(bounds=[0, 1],           show_as_log=False,   normalize_by=None),
+    # xylem_differentiation_factor=          dict(bounds=[0, 1],           show_as_log=False,   normalize_by=None),
+    # apoplastic_Nm_soil_xylem=          dict(bounds=None,           show_as_log=False,   normalize_by="length"),
+    axis_type=          dict(bounds=None,           show_as_log=False,   normalize_by=None),
 )
 
 
 class Logger:
 
     light_log = dict(recording_images=False, recording_off_screen=True, auto_camera_position=False,
-                    plotted_property="import_Nm", flow_property=True, show_soil=False, imposed_clim=usual_clims["import_Nm"]["bounds"],
+                    plotted_property="import_Nm", flow_property=True, show_soil=False, imposed_clim=[1e-13, 1e-9],
                     recording_mtg=False,
                     recording_raw=False,
-                    final_snapshots=True,
+                    final_snapshots=True, root_colormap = 'Dark2',
                     export_3D_scene=False,
                     recording_sums=True,
                     recording_performance=True,
@@ -58,7 +66,7 @@ class Logger:
                     on_shoot_logs=False)
     
     medium_log_focus_images = dict(recording_images=True, recording_off_screen=True, auto_camera_position=False,
-                    plotted_property="import_Nm", flow_property=False, show_soil=False, imposed_clim=usual_clims["import_Nm"]["bounds"],
+                    plotted_property="net_Nm_uptake", flow_property=False, show_soil=False, imposed_clim=usual_clims["net_Nm_uptake"]["bounds"], log_scale=True,
                     recording_mtg=False,
                     recording_raw=False,
                     final_snapshots=True,
@@ -72,7 +80,7 @@ class Logger:
                     on_shoot_logs=True)
     
     medium_log_focus_properties = dict(recording_images=False, recording_off_screen=True, auto_camera_position=False,
-                    plotted_property="import_Nm", flow_property=True, show_soil=False, imposed_clim=usual_clims["import_Nm"]["bounds"],
+                    plotted_property="C_hexose_root", flow_property=True, show_soil=False, imposed_clim=usual_clims["C_hexose_root"]["bounds"],
                     recording_mtg=False,
                     recording_raw=True,
                     final_snapshots=False,
@@ -86,7 +94,7 @@ class Logger:
                     on_shoot_logs=False)
     
     heavy_log = dict(recording_images=True, recording_off_screen=True, auto_camera_position=False,
-                     plotted_property="import_Nm", flow_property=False, show_soil=False, imposed_clim=usual_clims["import_Nm"]["bounds"],
+                     plotted_property="import_Nm", flow_property=False, show_soil=False, imposed_clim=[1e-13, 1e-9],
                     recording_mtg=False,
                     recording_raw=True,
                     final_snapshots=True,
@@ -288,9 +296,7 @@ class Logger:
         else:
             self.clim = self.imposed_clim
 
-        log_scale = False
-
-        custom_colorbar(folderpath=self.root_images_dirpath, label=self.plotted_property, vmin=self.clim[0], vmax=self.clim[1], colormap=self.root_colormap, vertical=False, log_scale=log_scale)
+        custom_colorbar(folderpath=self.root_images_dirpath, label=self.plotted_property, vmin=self.clim[0], vmax=self.clim[1], colormap=self.root_colormap, vertical=False, log_scale=self.log_scale)
 
         sizes = {"landscape": [1920, 1080], "portrait": [1088, 1920], "square": [1080, 1080],
                     "small_height": [960, 1280]}
@@ -537,34 +543,43 @@ class Logger:
             if 0. in color_property:
                 color_property.remove(0.)
 
-            # Accounts for smooth color bar transitions for videos.
-            if len(color_property) > 0:
-                self.prop_mins = self.prop_mins[1:] + [min(color_property)]
-                self.prop_maxs = self.prop_maxs[1:] + [max(color_property)]
+            str_prop = False
+            if isinstance(color_property[0], str):
+                str_prop = True
 
-            mean_mins = np.mean([e for e in self.prop_mins if e is not None])
-            mean_maxs = np.mean([e for e in self.prop_maxs if e is not None])
+            if not str_prop:
+                # Accounts for smooth color bar transitions for videos.
+                if len(color_property) > 0:
+                    self.prop_mins = self.prop_mins[1:] + [min(color_property)]
+                    self.prop_maxs = self.prop_maxs[1:] + [max(color_property)]
 
-            if self.prop_mins[-1] < self.all_times_low and self.prop_mins[-1] != 0:
-                self.all_times_low = self.prop_mins[-1]
-            elif mean_mins > 1.1 * self.all_times_low:
-                self.all_times_low = mean_mins
-            if self.prop_maxs[-1] > self.all_times_high:
-                self.all_times_high = self.prop_maxs[-1]
-            elif mean_maxs < 0.9 * self.all_times_high:
-                self.all_times_high = mean_maxs
+                mean_mins = np.mean([e for e in self.prop_mins if e is not None])
+                mean_maxs = np.mean([e for e in self.prop_maxs if e is not None])
+
+                if self.prop_mins[-1] < self.all_times_low and self.prop_mins[-1] != 0:
+                    self.all_times_low = self.prop_mins[-1]
+                elif mean_mins > 1.1 * self.all_times_low:
+                    self.all_times_low = mean_mins
+                if self.prop_maxs[-1] > self.all_times_high:
+                    self.all_times_high = self.prop_maxs[-1]
+                elif mean_maxs < 0.9 * self.all_times_high:
+                    self.all_times_high = mean_maxs
 
             self.plotter.remove_actor(self.current_mesh)
             self.plotter.remove_actor(self.plot_text)
 
-            if isinstance(self.imposed_clim, bool):
-                if self.imposed_clim and isinstance(self.fields[self.plotted_property]["min_value"], float):
-                    self.clim = [self.fields[self.plotted_property]["min_value"],
-                            self.fields[self.plotted_property]["max_value"]]
+            if not str_prop:
+                if isinstance(self.imposed_clim, bool):
+                    if self.imposed_clim and isinstance(self.fields[self.plotted_property]["min_value"], float):
+                        self.clim = [self.fields[self.plotted_property]["min_value"],
+                                self.fields[self.plotted_property]["max_value"]]
+                    else:
+                        self.clim = [self.all_times_low, self.all_times_high]
                 else:
-                    self.clim = [self.all_times_low, self.all_times_high]
+                    self.clim = self.imposed_clim
+
             else:
-                self.clim = self.imposed_clim
+                self.clim = [0, 4]
 
             self.current_mesh = self.plotter.add_mesh(root_system_mesh, cmap=self.root_colormap,
                                                       clim=self.clim, show_edges=False,
@@ -791,56 +806,75 @@ class Logger:
                 self.write_to_disk([self.mtg_to_dataset(variables=self.output_variables, time=self.simulation_time_in_hours)], custom_name="merged.nc")
             
             if not self.recording_images:
-                g = self.data_structures["root"]
-                props = g.properties()
-                vertices = [vid for vid in g.vertices(scale=g.max_scale()) if props["struct_mass"][vid] > 0]
-                self.logger_output.info("Saving a final snapshot...")
-                # try:
-                if not self.static_mtg:
-                    self.log_mtg_coordinates()
-                self.init_images_plotter()
-                for prop, formatting_options in usual_clims.items():
-                    self.logger_output.info(f"plotting final {prop}...")
-                    self.plotted_property = prop
-                    self.log_scale = formatting_options["show_as_log"]
-                    normalize_by = formatting_options["normalize_by"] # TODO for all of this use metadate instead!!
+                final_image_snapshot = True
+                if final_image_snapshot:
+                    g = self.data_structures["root"]
+                    props = g.properties()
+                    vertices = [vid for vid in g.vertices(scale=g.max_scale()) if props["struct_mass"][vid] > 0]
+                    self.logger_output.info("Saving a final snapshot...")
+                    # try:
+                    if not self.static_mtg:
+                        self.log_mtg_coordinates()
+                    self.init_images_plotter()
+                    for prop, formatting_options in usual_clims.items():
+                        discrete = False
+                        mapping = None
+                        self.logger_output.info(f"plotting final {prop}...")
+                        self.plotted_property = prop
+                        self.log_scale = formatting_options["show_as_log"]
+                        normalize_by = formatting_options["normalize_by"] # TODO for all of this use metadate instead!!
 
-                    if isinstance(formatting_options["bounds"], list):
-                        self.imposed_clim = formatting_options["bounds"]
-                    else:
-                        if normalize_by is not None:
-                            color_property = [props[prop][v] / props[normalize_by][v] for v in vertices]
+                        if isinstance(formatting_options["bounds"], list):
+                            self.imposed_clim = formatting_options["bounds"]
                         else:
-                            color_property = [props[prop][v] for v in vertices]
-                        min_value = min(color_property)
-                        max_value = max(color_property)
-                        if min_value < 0 and self.log_scale:
-                            # If the range is completely negative, not the right visualization option #TODO : add an option to switch all to positive and show negative in the legend
-                            if max_value < 0:
-                                self.logger_output.error("Using a negative property with a log scale.")
+                            if normalize_by is not None:
+                                color_property = [props[prop][v] / props[normalize_by][v] for v in vertices]
                             else:
-                                percentile = 10
-                                while percentile < 50 and min_value <= 0:
-                                    self.logger_output.info(f"Using a negative lower bound with a log scale. Rasing lower bound to {percentile}% percentile")
-                                    min_value = np.percentile(color_property, percentile)
-                                    percentile += 10
-                                
-                                # If still negative after this attempt, not the right visualization option, raise an error
-                                if min_value < 0:
-                                    self.logger_output.error("Using a mostly negative property with a log scale.")
-                        self.imposed_clim = [min_value, max_value]
-                    
-                    self.recording_images_with_pyvista(custom_name=f"{self.plotted_property}_", 
-                                                       parallel_compression=False, recording_video=False, normalize_by=normalize_by)
-                    if normalize_by is not None:
-                        unit = self.fields[prop]["unit"] + f"/({self.fields[normalize_by]['unit']})"
-                    else:
-                        unit = self.fields[prop]["unit"]
+                                color_property = [props[prop][v] for v in vertices]
+                            
+                            if isinstance(color_property[0], str):
+                                mapping = {chain: k for k, chain in enumerate(np.unique(color_property))}
+                                props[prop].update({v: mapping[props[prop][v]] for v in vertices})
+                                color_property = [props[prop][v] for v in vertices]
+                                self.imposed_clim = [min(color_property), max(color_property)]
+                                discrete=True
+                            else:
+                                # min_value = min(color_property)
+                                # max_value = max(color_property)
+                                min_value, max_value = np.percentile(color_property, q=[0.10, 0.90])
 
-                    custom_colorbar(folderpath=self.root_images_dirpath, label=prop, vmin=self.imposed_clim[0], vmax=self.imposed_clim[1], 
-                                    colormap=self.root_colormap, vertical=False, log_scale=self.log_scale, filename=f"{prop}_colorbar.png", unit = unit)
-                    self.plotter.screenshot(os.path.join(self.outputs_dirpath, f"root_images/{self.plotted_property}_{self.simulation_time_in_hours}.png"),
-                                        transparent_background=True, scale=5)
+                                if min_value < 0 and self.log_scale:
+                                    # If the range is completely negative, not the right visualization option #TODO : add an option to switch all to positive and show negative in the legend
+                                    if max_value < 0:
+                                        self.logger_output.error("Using a negative property with a log scale.")
+                                    else:
+                                        percentile = 10
+                                        while percentile < 50 and min_value <= 0:
+                                            self.logger_output.info(f"Using a negative lower bound with a log scale. Rasing lower bound to {percentile}% percentile")
+                                            min_value = np.percentile(color_property, percentile)
+                                            percentile += 10
+                                        
+                                        # If still negative after this attempt, not the right visualization option, raise an error
+                                        if min_value < 0:
+                                            self.logger_output.error("Using a mostly negative property with a log scale.")
+                                self.imposed_clim = [min_value, max_value]
+                        
+                        self.recording_images_with_pyvista(custom_name=f"{self.plotted_property}_", 
+                                                        parallel_compression=False, recording_video=False, normalize_by=normalize_by)
+                        if normalize_by is not None:
+                            unit = self.fields[prop]["unit"] + f"/({self.fields[normalize_by]['unit']})"
+                        else:
+                            unit = self.fields[prop]["unit"]
+
+                        try:
+                            custom_colorbar(folderpath=self.root_images_dirpath, label=prop, vmin=self.imposed_clim[0], vmax=self.imposed_clim[1], 
+                                            colormap=self.root_colormap, vertical=False, log_scale=self.log_scale, discrete=discrete, mapping=mapping,
+                                            filename=f"{prop}_colorbar.png", unit = unit)
+                        except:
+                            print("Failed colorbar generation")
+                            
+                        self.plotter.screenshot(os.path.join(self.outputs_dirpath, f"root_images/{self.plotted_property}_{self.simulation_time_in_hours}.png"),
+                                            transparent_background=True, scale=5)
 
             else:
                 if self.export_3D_scene:
