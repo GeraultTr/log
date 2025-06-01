@@ -45,7 +45,8 @@ usual_clims = dict(
     # exodermis_conductance_factor=          dict(bounds=[0, 1],           show_as_log=False,   normalize_by=None),
     # xylem_differentiation_factor=          dict(bounds=[0, 1],           show_as_log=False,   normalize_by=None),
     # apoplastic_Nm_soil_xylem=          dict(bounds=None,           show_as_log=False,   normalize_by="length"),
-    axis_type=          dict(bounds=None,           show_as_log=False,   normalize_by=None),
+    # axis_type=          dict(bounds=None,           show_as_log=False,   normalize_by=None),
+    diffusion_AA_soil=          dict(bounds=[1e-11, 4e-11],           show_as_log=False,   normalize_by="length"),
 )
 
 
@@ -55,7 +56,7 @@ class Logger:
                     plotted_property="import_Nm", flow_property=True, show_soil=False, imposed_clim=[1e-13, 1e-9],
                     recording_mtg=False,
                     recording_raw=False,
-                    final_snapshots=True, root_colormap = 'Dark2',
+                    final_snapshots=True, root_colormap = 'jet', # 'brg',
                     export_3D_scene=False,
                     recording_sums=True,
                     recording_performance=True,
@@ -66,7 +67,7 @@ class Logger:
                     on_shoot_logs=False)
     
     medium_log_focus_images = dict(recording_images=True, recording_off_screen=True, auto_camera_position=False,
-                    plotted_property="net_Nm_uptake", flow_property=False, show_soil=False, imposed_clim=usual_clims["net_Nm_uptake"]["bounds"], log_scale=True,
+                    plotted_property="C_hexose_root", flow_property=False, show_soil=False, imposed_clim=usual_clims["C_hexose_root"]["bounds"], log_scale=True,
                     recording_mtg=False,
                     recording_raw=False,
                     final_snapshots=True,
@@ -364,7 +365,7 @@ class Logger:
 
     def __call__(self):
         self.current_step_start_time = self.elapsed_time
-        if not self.static_mtg:
+        if not self.static_mtg and 'root' in self.data_structures:
             self.log_mtg_coordinates()
 
         if self.simulation_time_in_hours > 0:
@@ -491,7 +492,7 @@ class Logger:
         # convert dict to dataframe with index corresponding to coordinates in topology space
         # (not just x, y, z, t thanks to MTG structure)
         props_dict = {k: v for k, v in self.props["root"].items() if type(v) == dict and k in variables}
-        raw_soil = True
+        raw_soil = "soil" in self.props.keys()
         soil_target_variables = ["soil_temperature"]
         if raw_soil:
             soil_shape = self.props["soil"]["soil_temperature"].shape

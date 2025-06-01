@@ -264,7 +264,7 @@ def prepareScene(scene, width=1200, height=1200, scale=0.8, x_center=0., y_cente
 
     return scene
 
-def plot_mtg(g, prop_cmap='C_hexose_root', cmap='brg', lognorm=True, vmin=1e-6, vmax=1e-0,
+def plot_mtg(g, position=(0, 0, 0), rotation=0, prop_cmap='C_hexose_root', cmap='brg', lognorm=True, vmin=1e-6, vmax=1e-0,
              root_hairs_display=True,
              width=1200, height=910,
              x_center=0., y_center=0., z_center=-0.1,
@@ -296,8 +296,14 @@ def plot_mtg(g, prop_cmap='C_hexose_root', cmap='brg', lognorm=True, vmin=1e-6, 
     turtle = turt.PglTurtle()
     # We make the graph upside down:
     turtle.down(180)
+
+    # Adjust initial position in the scene
+    turtle.rollL(rotation)
+    turtle.shift(position)
+    
     # We initialize the scene with the MTG g:
     scene = turt.TurtleFrame(g, visitor=visitor, turtle=turtle, gc=False)
+
     # We update the scene with the specified position of the center of the graph and the camera:
     #prepareScene(scene, width=width, height=height,
     #             x_center=x_center, y_center=y_center, z_center=z_center, x_cam=x_cam, y_cam=y_cam, z_cam=z_cam)
