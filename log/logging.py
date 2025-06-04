@@ -114,7 +114,6 @@ class Logger:
                  recording_sums=False, recording_raw=False, recording_mtg=False, recording_images=False, root_colormap="jet", log_scale=True,
                  recording_off_screen=False, static_mtg=False, auto_camera_position=False, imposed_clim=True,
                  recording_performance=False,
-                 recording_shoot=False,
                  final_snapshots=False,
                  export_3D_scene=False,
                  plotted_property="hexose_exudation", flow_property=False, show_soil=False,
@@ -164,7 +163,7 @@ class Logger:
         self.recording_sums = recording_sums
         self.recording_raw = recording_raw
         self.recording_mtg = recording_mtg
-        self.recording_shoot = recording_shoot
+        self.recording_shoot = hasattr(model_instance, "shoot")
         if self.recording_shoot:
             self.shoot = model_instance.shoot
         if "root" not in self.data_structures.keys():
@@ -271,7 +270,8 @@ class Logger:
         file_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
 
         # Attach handlers to the logger
-        self.logger_output.addHandler(console_handler)
+        if echo:
+            self.logger_output.addHandler(console_handler)
         self.logger_output.addHandler(file_handler)
 
         self.logger_output.info(f"Launching {os.path.basename(outputs_dirpath)}...")
@@ -491,10 +491,16 @@ class Logger:
                        time=0):
         # convert dict to dataframe with index corresponding to coordinates in topology space
         # (not just x, y, z, t thanks to MTG structure)
-        props_dict = {k: v for k, v in self.props["root"].items() if type(v) == dict and k in variables}
-        raw_soil = "soil" in self.props.keys()
+
+        props_dict = {}
+
+        is_root_data = 'root' in self.props.keys()
+        if is_root_data:
+            props_dict.update({k: v for k, v in self.props["root"].items() if type(v) == dict and k in variables})
+
+        is_raw_soil = "soil" in self.props.keys()
         soil_target_variables = ["soil_temperature"]
-        if raw_soil:
+        if is_raw_soil:
             soil_shape = self.props["soil"]["soil_temperature"].shape
             voxel_number = soil_shape[0] * soil_shape[1] * soil_shape[2]
             voxel_ids = [-(i+1) for i in range(voxel_number)]
@@ -511,8 +517,9 @@ class Logger:
         # Filter duplicated indexes
         props_df = props_df[~props_df.index.duplicated()]
 
-        # Remove false root segments created just for branching regularity issues (vid 0, 2, 4, etc)
-        props_df = props_df[props_df["struct_mass"] > 0]
+        if is_root_data:
+            # Remove false root segments created just for branching regularity issues (vid 0, 2, 4, etc)
+            props_df = props_df[props_df["struct_mass"] > 0]
 
         # Convert to xarray with given dimensions to spatialize selected properties
         props_ds = props_df.to_xarray()
@@ -808,7 +815,7 @@ class Logger:
             
             if not self.recording_images:
                 final_image_snapshot = True
-                if final_image_snapshot:
+                if "root" in self.data_structures and final_image_snapshot:
                     g = self.data_structures["root"]
                     props = g.properties()
                     vertices = [vid for vid in g.vertices(scale=g.max_scale()) if props["struct_mass"][vid] > 0]
