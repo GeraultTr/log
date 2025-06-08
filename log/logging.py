@@ -67,7 +67,7 @@ class Logger:
                     on_shoot_logs=False)
     
     medium_log_focus_images = dict(recording_images=True, recording_off_screen=True, auto_camera_position=False,
-                    plotted_property="C_hexose_root", flow_property=False, show_soil=False, imposed_clim=usual_clims["C_hexose_root"]["bounds"], log_scale=True,
+                    plotted_property="net_Nm_uptake", flow_property=False, show_soil=False, imposed_clim=usual_clims["C_hexose_root"]["bounds"], log_scale=True,
                     recording_mtg=False,
                     recording_raw=False,
                     final_snapshots=True,
