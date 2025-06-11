@@ -22,7 +22,7 @@ from log.visualize import plot_mtg, plot_mtg_alt, soil_voxels_mesh, shoot_plantg
 # with 24h static strategy
 usual_clims = dict(
     # Nm=                             dict(bounds=[1e-4, 3e-3],   show_as_log=True,   normalize_by=None), 
-    # hexose_exudation=               dict(bounds=[1e-13, 1e-9],  show_as_log=True,   normalize_by="length"),
+    hexose_exudation=               dict(bounds=[1e-13, 1e-9],  show_as_log=True,   normalize_by="length"),
     # net_hexose_production_from_phloem=   dict(bounds=None,  show_as_log=False,   normalize_by="length"),
     # import_Nm=                      dict(bounds=[1e-12, 5e-10],  show_as_log=True,   normalize_by="length"),
     net_Nm_uptake=                  dict(bounds=[5e-12, 2e-10],  show_as_log=True,   normalize_by="length"),
@@ -49,6 +49,11 @@ usual_clims = dict(
     diffusion_AA_soil=          dict(bounds=[1e-11, 4e-11],           show_as_log=False,   normalize_by="length"),
 )
 
+# xarray_focus_variables = []
+xarray_focus_variables = ["struct_mass", "living_struct_mass", "length", "z1", "z2", "axis_type", "root_order", "thermal_time_since_cells_formation",
+                          "hexose_exudation", "diffusion_AA_soil", "import_Nm", "apoplastic_Nm_soil_xylem", "net_Nm_uptake", "radial_import_water", "root_exchange_surface",
+                          "hexose_consumption_by_growth", "amino_acids_consumption_by_growth",
+                          "soil_temperature"]
 
 class Logger:
 
@@ -81,10 +86,10 @@ class Logger:
                     on_shoot_logs=True)
     
     medium_log_focus_properties = dict(recording_images=False, recording_off_screen=True, auto_camera_position=False,
-                    plotted_property="C_hexose_root", flow_property=True, show_soil=False, imposed_clim=usual_clims["C_hexose_root"]["bounds"],
+                    plotted_property="import_Nm", flow_property=True, show_soil=False, imposed_clim=[1e-13, 1e-9],
                     recording_mtg=False,
                     recording_raw=True,
-                    final_snapshots=False,
+                    final_snapshots=True, root_colormap = 'jet', # 'brg',
                     export_3D_scene=False,
                     recording_sums=True,
                     recording_performance=True,
@@ -95,7 +100,7 @@ class Logger:
                     on_shoot_logs=False)
     
     heavy_log = dict(recording_images=True, recording_off_screen=True, auto_camera_position=False,
-                     plotted_property="import_Nm", flow_property=False, show_soil=False, imposed_clim=[1e-13, 1e-9],
+                     plotted_property="hexose_exudation", flow_property=True, show_soil=False, imposed_clim=[1e-13, 1e-10],
                     recording_mtg=False,
                     recording_raw=True,
                     final_snapshots=True,
@@ -215,6 +220,7 @@ class Logger:
 
         if self.output_variables == {}:
             # descriptors = []
+            self.xarray_focus_variables = {}
             descriptors = ["root_order", "label", "type", "axis_index"]
             for model in self.components:
                 self.summable_output_variables += model.extensive_variables + model.non_inertial_extensive
@@ -225,6 +231,7 @@ class Logger:
                                     i in self.props.keys()]  # To prevent getting inputs that are not provided neither from another model nor mtg
                 self.output_variables.update(
                     {f.name: f.metadata for f in fields(model) if f.name in self.summable_output_variables + self.meanable_output_variables + self.plant_scale_state + descriptors})
+                self.xarray_focus_variables.update({f.name: f.metadata for f in fields(model) if f.name in xarray_focus_variables})
                 self.units_for_outputs.update({f.name: f.metadata["unit"] for f in fields(model) if
                                                f.name in self.summable_output_variables + self.meanable_output_variables + self.plant_scale_state})
 
@@ -386,7 +393,11 @@ class Logger:
             if self.recording_mtg:
                 self.recording_mtg_files()
             if self.recording_images:
-                self.recording_images_with_pyvista()
+                if self.flow_property:
+                    normalize_by = "length"
+                else:
+                    normalize_by = None
+                self.recording_images_with_pyvista(normalize_by=normalize_by)
 
         self.simulation_time_in_hours += self.time_step_in_hours
         self.previous_step_start_time = self.current_step_start_time
@@ -475,7 +486,7 @@ class Logger:
         self.plant_scale_properties = pd.concat([self.plant_scale_properties, step_sum])
 
     def recording_raw_MTG_properties_in_xarray(self):
-        self.log_xarray += [self.mtg_to_dataset(variables=self.output_variables, time=self.simulation_time_in_hours)]
+        self.log_xarray += [self.mtg_to_dataset(variables=self.xarray_focus_variables, time=self.simulation_time_in_hours)]
         # 10000 corresponds to 14Gb on disk, so should be to 2000 when testing several scenarios to avoid saturating memory
         if sys.getsizeof(self.log_xarray) > 2000:
             self.logger_output.info("Merging stored properties data in one xarray dataset...")
